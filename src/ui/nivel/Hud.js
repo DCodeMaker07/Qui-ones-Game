@@ -3,7 +3,7 @@ import { COLOR, TXT, MARGEN, CAPA, estiloHud } from '../tema.js';
 import { paralelogramo } from '../dibujo.js';
 import { crearVidrio } from '../vidrio.js';
 import BarraHabilidades from './BarraHabilidades.js';
-import { nombreTecla, TECLAS, VIDA_JUGADOR } from '../../sistemas/nivel/constantes.js';
+import { nombreTecla, PUNTAJE_FINAL_BUENO, TECLAS, VIDA_JUGADOR } from '../../sistemas/nivel/constantes.js';
 
 // HUD del piloto, al estilo de GTA IV: retrato con marco blanco abajo a la izquierda (ahí iría el radar), las barras
 // inclinadas al lado, los números grandes con borde negro arriba a la derecha y el objetivo de la misión arriba a la izquierda.
@@ -63,6 +63,7 @@ export default class Hud {
     // Arriba a la izquierda: el objetivo, con una flechita naranja como en las misiones de GTA
     this.flecha = e.add.triangle(MARGEN, MARGEN + 12, 0, 0, 0, 20, 16, 10, COLOR.naranja).setOrigin(0, 0.5);
     this.txtObjetivo = e.add.text(MARGEN + 26, MARGEN, '', estiloHud(24));
+    this.txtPuntaje = e.add.text(MARGEN + 26, MARGEN + 36, '', estiloHud(20, { color: TXT.dorado }));
 
     // Arriba al centro: distancia a la base (solo en los niveles con base fija)
     if (e.cfg.baseFija) {
@@ -78,7 +79,7 @@ export default class Hud {
 
     this.objetos = [
       this.gFondoRetrato, this.retrato, this.gMarco, this.etqVida, this.gVida, this.txtAliados,
-      this.iconoBotiquin, this.txtBotiquines, this.etqBotiquin, this.txtMeta, this.etqMeta, this.flecha, this.txtObjetivo,
+      this.iconoBotiquin, this.txtBotiquines, this.etqBotiquin, this.txtMeta, this.etqMeta, this.flecha, this.txtObjetivo, this.txtPuntaje,
       this.txtKm, this.gKm, this.txtControles, ...this.barra.objetos,
     ].filter(Boolean);
     this.objetos.forEach((o) => o.setDepth(CAPA.hud));
@@ -99,6 +100,7 @@ export default class Hud {
     this.cambiarTexto(this.txtBotiquines, `×${e.botiquin.restantes}`);
     this.cambiarTexto(this.etqBotiquin, e.multijugador.hayLayla() ? 'PÍDELO A LAYLA' : `BOTIQUÍN [${TECLAS.botiquin}]`);
     this.cambiarTexto(this.txtObjetivo, this.textoObjetivo());
+    this.cambiarTexto(this.txtPuntaje, `PUNTOS ${e.puntaje.total} / ${PUNTAJE_FINAL_BUENO}`);
     if (e.cfg.meta) {
       this.cambiarTexto(this.txtMeta, `${e.destruidos}/${e.cfg.meta}`);
       this.cambiarTexto(this.etqMeta, 'POSICIONES');
@@ -108,7 +110,7 @@ export default class Hud {
 
   textoObjetivo() {
     const e = this.escena;
-    if (e.especial.hayFuego()) return `Apaga el fuego con agua (${TECLAS.agua})`;
+    if (e.especial.fuegoBloqueante()) return `Apaga el fuego con agua (${TECLAS.agua})`;
     if (e.cfg.meta) return 'Destruye las posiciones antiaéreas';
     if (e.picada.lista) return 'Lánzate en picada (ENTER)';
     if (e.fase === 'base') return `Pide refuerzos por radio (${TECLAS.radio})`;

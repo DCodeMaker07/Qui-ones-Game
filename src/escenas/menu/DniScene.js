@@ -1,3 +1,4 @@
+import { reiniciarPuntaje } from '../../sistemas/nivel/Puntaje.js';
 import Phaser from 'phaser';
 import { FUENTE, FUENTE_TITULO } from '../../config.js';
 import { DNI_PRUEBA, generoPorDni } from '../../datos/dni.js';
@@ -13,6 +14,7 @@ export default class DniScene extends Phaser.Scene {
 
   create() {
     const { width, height } = this.scale;
+    reiniciarPuntaje(this.registry); // una partida nueva empieza en cero
     iniciarMusicaMenu(this); // sigue la música del título
     this.fondo = new FondoBatalla(this); // el mismo campo de batalla en vivo del menú
     this.add.rectangle(0, 0, width, height, 0x000000, 0.5).setOrigin(0).setDepth(20);

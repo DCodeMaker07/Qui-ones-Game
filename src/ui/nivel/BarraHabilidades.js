@@ -2,10 +2,11 @@ import { CAPA, FUENTE_UI, MARGEN, estiloHud } from '../tema.js';
 import { barridoCuadrado } from '../dibujo.js';
 import { crearVidrio } from '../vidrio.js';
 import { GOTA } from '../../sistemas/nivel/agua.js';
+import { TONEL_ICONO } from '../../sistemas/nivel/iconos.js';
 import { nombreTecla, TECLAS } from '../../sistemas/nivel/constantes.js';
 
 // La barra de habilidades de abajo al centro, al estilo de League of Legends pero de vidrio líquido: cuatro cuadros grandes
-// (Q, W, E, R), uno más chico para el agua (F) y, a la izquierda, el indicador de altura. Cada habilidad tiene la tecla arriba
+// (Q, W, E, R), dos más chicos para el agua (F) y el tonel (X) y, a la izquierda, el indicador de altura. Cada habilidad tiene la tecla arriba
 // y, mientras se recarga, se oscurece con un reloj que gira y muestra los segundos que faltan; al volver a estar lista hace un
 // destello. Solo dibuja: los datos los pide a Habilidades.estado() y Altura.estado().
 const LADO = 68;
@@ -19,14 +20,14 @@ const TINTE_RECARGA = 0x8d97a3; // el vidrio se apaga mientras la habilidad se r
 const TINTE_ACTIVA = 0xffb86b; // y se enciende mientras la estoy usando
 const CELESTE = 0x9fe2ff;
 // El tinte del vidrio de cada cuadro: neutro, cálido para la R (fuego) y azul para el agua
-const TINTES = [0xe6f1ff, 0xe6f1ff, 0xe6f1ff, 0xffd9a8, 0xa8d8ff];
+const TINTES = [0xe6f1ff, 0xe6f1ff, 0xe6f1ff, 0xffd9a8, 0xa8d8ff, 0xd0f2ff];
 
 export default class BarraHabilidades {
   constructor(escena) {
     this.escena = escena;
     this.objetos = [];
-    this.destello = [0, 0, 0, 0, 0]; // brillo blanco que se apaga solo cuando la habilidad vuelve a estar lista
-    this.estabaLista = [true, true, true, true, true];
+    this.destello = TINTES.map(() => 0); // brillo blanco que se apaga solo cuando la habilidad vuelve a estar lista
+    this.estabaLista = TINTES.map(() => true);
     this.ultimaHora = escena.time.now;
     this.crear();
   }
@@ -34,12 +35,15 @@ export default class BarraHabilidades {
   crear() {
     const e = this.escena;
     const { width, height } = e.scale;
-    const total = LADO * 4 + SEPARACION * 3 + SEPARACION_AGUA + LADO_AGUA;
+    const total = LADO * 4 + SEPARACION * 3 + SEPARACION_AGUA + LADO_AGUA * 2 + SEPARACION;
     const x0 = width / 2 - total / 2;
     const base = height - MARGEN; // borde de abajo de todos los cuadros
     // Cada cuadro: centro y lado. Q, W, E y R grandes y el agua más chica, alineada abajo
     this.cuadros = [0, 1, 2, 3].map((i) => ({ lado: LADO, cx: x0 + i * (LADO + SEPARACION) + LADO / 2, cy: base - LADO / 2 }));
-    this.cuadros.push({ lado: LADO_AGUA, cx: x0 + total - LADO_AGUA / 2, cy: base - LADO_AGUA / 2 });
+    // El agua (F) y el tonel (X), más chicos, uno al lado del otro a la derecha
+    const xAgua = x0 + LADO * 4 + SEPARACION * 3 + SEPARACION_AGUA + LADO_AGUA / 2;
+    this.cuadros.push({ lado: LADO_AGUA, cx: xAgua, cy: base - LADO_AGUA / 2 });
+    this.cuadros.push({ lado: LADO_AGUA, cx: xAgua + LADO_AGUA + SEPARACION, cy: base - LADO_AGUA / 2 });
 
     const panel = crearVidrio(e, x0 - 16, base - LADO - 14, total + 32, LADO + 28);
     // Cada cuadro tiene su propio vidrio, un poco más claro, para que se vea el marco de cada habilidad
@@ -80,6 +84,7 @@ export default class BarraHabilidades {
       [bala(c[2].cx - 15, c[2].cy + 2, -24), bala(c[2].cx, c[2].cy - 2), bala(c[2].cx + 15, c[2].cy + 2, 24)],
       [llama],
       [e.add.image(c[4].cx, c[4].cy, GOTA).setScale(0.55)],
+      [e.add.image(c[5].cx, c[5].cy, TONEL_ICONO).setScale(0.62)],
     ];
   }
 

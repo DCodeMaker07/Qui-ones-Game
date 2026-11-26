@@ -10,7 +10,7 @@ export default class MenuPausa {
       titulo: 'PAUSA',
       opciones: [
         { texto: 'Continuar', accion: () => this.reanudar() },
-        { texto: 'Reiniciar nivel', accion: () => escena.scene.restart() },
+        { texto: 'Reiniciar nivel', accion: () => { escena.puntoDeControl.borrar(); escena.scene.restart({ reanudar: false }); } }, // desde cero
         { texto: 'Salir al menú', accion: () => escena.scene.start('TitleScene', { rapido: true }) }, // la música del menú entra enseguida
       ],
       pista: 'FLECHAS + ENTER      ESC: CONTINUAR',

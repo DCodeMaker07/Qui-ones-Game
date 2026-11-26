@@ -4,7 +4,7 @@ import FondoBatalla from '../../entidades/FondoBatalla.js';
 import { ajustes } from '../../sistemas/audio/ajustes.js';
 import { playSfx } from '../../sistemas/audio/audio.js';
 import { actualizarMusicaMenu, iniciarMusicaMenu } from '../../sistemas/audio/musicaMenu.js';
-import { AGUA_ESPERA, BOMBA_ESPERA, nombreTecla, RAFAGA_ESPERA, TECLAS, ULTI_ESPERA } from '../../sistemas/nivel/constantes.js';
+import { AGUA_ESPERA, BOMBA_ESPERA, nombreTecla, RAFAGA_ESPERA, TECLAS, TONEL_ESPERA, ULTI_ESPERA } from '../../sistemas/nivel/constantes.js';
 import { marcoRedondeado } from '../../ui/dibujo.js';
 import { COLOR, FUENTE, FUENTE_TITULO, FUENTE_UI, TXT } from '../../ui/tema.js';
 
@@ -31,6 +31,7 @@ const CONTROLES = [
   ['RÁFAGA', `${TECLAS.rafaga}  (recarga ${RAFAGA_ESPERA} s)`],
   ['ESPECIAL', `${TECLAS.especial}  (bombardeo de fuego, recarga ${ULTI_ESPERA} s)`],
   ['ALTURA', `${nombreTecla(TECLAS.subir)} sube, ${TECLAS.bajar} baja (los enemigos te siguen)`],
+  ['TONEL', `${TECLAS.tonel}  (esquiva y devuelve las balas, recarga ${TONEL_ESPERA} s)`],
   ['AGUA', `${TECLAS.agua}  (apaga el fuego de la R, recarga ${AGUA_ESPERA} s)`],
   ['RADIO', `${TECLAS.radio}  (hablas y Layla repite tu voz)`],
   ['BOTIQUÍN', `${TECLAS.botiquin}  o decir "botiquín"`],
@@ -325,7 +326,7 @@ export default class TitleScene extends Phaser.Scene {
       this.iniciando = true;
       this.time.delayedCall(170, () => this.scene.start('DniScene')); // espero un instante para que se vea la animación
     } else if (opcion === 'Controles') {
-      this.abrirPanel('CONTROLES', CONTROLES.map(([a, b]) => a.padEnd(11) + b).join('\n'), 'left');
+      this.abrirPanel('CONTROLES', CONTROLES.map(([a, b]) => a.padEnd(11) + b).join('\n'), 'left', 16, 6); // letra más chica: son 10 líneas
     } else if (opcion === 'Audio') {
       this.abrirAudio();
     } else if (!this.panelAbierto) {

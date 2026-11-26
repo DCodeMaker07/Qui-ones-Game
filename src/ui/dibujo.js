@@ -60,3 +60,10 @@ export function barridoCuadrado(g, cx, cy, mitad, fraccion, color, alfa) {
   puntos.push({ x: cx, y: cy - mitad });
   g.fillPoints(puntos, true);
 }
+
+// Pone un objeto en blanco y negro con el filtro de escala de grises de Phaser. Si el navegador no tiene filtros, lo apaga con un
+// tinte gris. Lo uso para Quiñones en el final histórico, donde muere.
+export function aGris(objeto) {
+  if (objeto.preFX) objeto.preFX.addColorMatrix().grayscale(1);
+  else objeto.setTint(0x9a9a9a);
+}
