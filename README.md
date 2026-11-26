@@ -28,6 +28,7 @@ Atajos útiles: `http://localhost:5173/#nivel1` o `#nivel2` saltan directo a un 
 | E | Ráfaga: 5 tandas de 3 balas en abanico. Enfriamiento de 7 s |
 | R | Bombardeo especial de fuego (ver abajo). Enfriamiento de 25 s |
 | F | Agua: apaga el fuego de la R. Enfriamiento de 8 s |
+| X | Tonel: una vuelta completa. Esquiva todo el daño, devuelve las balas enemigas y da un salto. Enfriamiento de 6 s |
 | ESPACIO / C | Subir / bajar de altura de vuelo (alto, normal, bajo). Espera de 4 s entre un cambio y otro |
 | T | Radio: hablas, el juego reconoce tu voz y Layla (torre) la repite con voz H/M |
 | B (o decir "botiquín" por radio) | Botiquín con paracaídas que cura a los soldados aliados heridos |
@@ -38,6 +39,14 @@ Atajos útiles: `http://localhost:5173/#nivel1` o `#nivel2` saltan directo a un 
 - **Botiquines:** 3 por nivel, 10 s de espera entre uno y otro. Los aliados heridos (tinte rojizo) caminan hacia el botiquín aterrizado.
 - **Altura de vuelo (ESPACIO sube, C baja):** hay tres alturas (bajo, normal y alto) y un avión solo puede lastimar a otro, o recibir sus balas, si van a la misma. Si cambio de altura las balas enemigas pasan de largo (se ven transparentes) y mis balas no le pegan a los aviones que quedaron en otro piso. Entre 2,5 y 3,5 s después los enemigos reaccionan y suben o bajan un piso para seguirme; mientras tanto no disparan. Se nota en el tamaño del avión y en su sombra. Entre un cambio y otro hay 4 s de espera, para no esquivar todo el tiempo.
 - **Vidas:** Quiñones tiene 5 vidas.
+- **Barrera (multijugador):** Layla puede colocar una barrera desde su panel (botón "Barrera…" y clic en el mapa). Frena las balas de las torretas y de los soldados enemigos (aguanta 10 impactos), baja con el terreno y los aviones no la afectan. Son 4 por nivel con 15 s de espera entre una y otra. Usa `barrera_aliada.png`. Es un mensaje nuevo del protocolo, así que el servidor pasó a la versión 4 y hay que reiniciarlo o volver a desplegarlo en Render.
+- **Filas de soldados:** cada 28 a 40 s (la primera a los 20 s) sale una fila o una columna de 7 soldados enemigos, para que el bombardeo de fuego (R) los barra de una pasada.
+- **Fuego chico:** solo un fuego grande (8 focos o más, `FUEGO_MIN_BLOQUEO`) frena el mapa y a los soldados. Un parche chico no bloquea nada: sigue su camino con el terreno y mis soldados lo rodean.
+- **Oleadas de aviones:** los aviones enemigos vienen en grupos de 2 o 3. Cuando derroto a todos (o se retiran), empieza una espera de 14 s (`ESPERA_OLEADA`) antes de la siguiente, así puedo ocuparme de las torretas sin que lleguen más enseguida. En los niveles de la base los aviones también salen en oleadas.
+- **Punto de control:** cada vez que despejo un grupo de torretas, y al llegar a la base, el juego guarda cuánto llevo (torretas destruidas, distancia, puntaje y botiquines). Si me derriban, la pantalla de derrota ofrece "Continuar desde el punto" (con todas las vidas) o "Empezar el nivel de cero". Se guarda mientras el juego está abierto (no en el disco) y se borra al terminar el nivel o empezar una partida nueva.
+- **Tonel (X):** mientras dura (0,5 s) el avión no recibe daño, las balas enemigas que lo tocan salen rebotadas (celestes) y pueden pegarles a los aviones, y si choca con un avión lo destruye sin perder vida. Da un empujón de unos 120 px hacia donde me muevo.
+- **Puntaje y final:** el puntaje pasa de un nivel a otro y se ve arriba a la izquierda. Suma: torreta 100, depósito o base 500, avión derribado 150, soldado enemigo 25 y, al terminar cada nivel, 300 más 100 por cada vida que queda. Resta 40 por cada soldado aliado que cae. Al lanzarse en picada, si el puntaje llega a `PUNTAJE_FINAL_BUENO` (7000) se desbloquea el **final alternativo**, donde Quiñones sobrevive. Con menos se ve el **final histórico**, donde muere, y Quiñones aparece **en gris** (su retrato en el tributo y su avión en el ending). Los puntos y la meta están en `PUNTOS` y `PUNTAJE_FINAL_BUENO` (`sistemas/nivel/constantes.js`) y hay que ajustarlos jugando.
+- **Soldados caídos:** cuando muere un soldado, aliado o enemigo, queda su cráter (`pose-muerte-aliado.png` y `pose-muerte-enemigo.png`), que llega con un golpe y polvo, baja con el terreno y se desvanece a los 7 s (`CAIDO_PERMANENCIA_MS`). El dibujo es opcional.
 - **Aviones enemigos:** entran por arriba y se quedan patrullando en la mitad de arriba de la pantalla (máximo 3 a la vez durante el avance) mientras queden torretas o la base. Cuando destruyes todas las defensas se retiran por arriba.
 - **Rumbo del avión:** el avión de Quiñones apunta hacia donde se mueve, en las ocho direcciones (a los lados mira de lado, hacia abajo mira hacia atrás y en las diagonales va a 45°). Gira rápido pero no de golpe y, si se queda quieto, conserva el último rumbo. **Las balas (W y E) salen hacia donde apunta la nariz.** La velocidad de giro se ajusta con `GIRO_JUGADOR`.
 - **Quién pelea con quién:** avión contra avión (los aviones enemigos le disparan a mi avión y mis balas W/E les pegan a ellos) y soldados contra torretas y soldados (las torretas y los soldados enemigos solo le disparan a mis soldados aliados, no a mi avión). Cada nido tiene dos soldados enemigos de guardia y la base tiene una guarnición de cinco. Mis soldados se paran a dispararles (0,8 de vida por segundo) y también los matan mis bombas (Q) y el fuego de la R.
@@ -173,9 +182,9 @@ src/
       Aliados, SoldadosEnemigos, Enemigos, Botiquines     quién pelea y ayuda
       Habilidades, Altura, BombardeoEspecial, GuiaBomba   mis habilidades Q, W, E, R, F y la altura de vuelo
       Avance, BaseEnemiga, Picada, Multijugador           cómo avanza el mapa, la base, el final y el modo con Layla
-      agua.js, constantes.js                              la gota de agua y los números de ajuste
+      agua.js, iconos.js, Puntaje.js, constantes.js       la gota de agua, el ícono del tonel, el puntaje y los números de ajuste
     audio/                 audio.js, ajustes.js, pistas.js, musicaMenu.js, VoiceSystem.js
-    efectos/               Ambiente (fondo animado), BaseEnLlamas, rio, bomba, aerodromo (pista, torre, hangar)
+    efectos/               Ambiente (fondo animado), BaseEnLlamas, bomba, aerodromo (pista, torre, hangar)
     ending/                guion.js (qué y cuándo), planos.js (cada plano), efectos.js
     herramientas/          MasterMenu (Ctrl + Shift + A) y placeholders
     three/                 avionNA50.js, el avión en 3D (vista previa en public/vista-avion.html)
@@ -207,12 +216,12 @@ public/assets/
     musica/              musica_*.mp3
     efectos/             sfx_*.mp3
     voces/               <escena>_<nn>.mp3 (grabaciones de tus amigos)
-  fondos/                terrenos de los niveles y fondo del palacio (rio.png opcional)
+  fondos/                terrenos de los niveles y fondo del palacio
   sprites/
     aviones/             avion_jugador, avion_jugador_danado, avion_enemigo (paracaidas.png opcional)
     armas/               bomba, bala, explosion, llama
-    soldados/            soldado_aliado_*, soldado_enemigo_*, pose-muerte-aliado
-    objetivos/           nido_base, nido_arma, deposito, base_enemiga, botiquin_aire, botiquin_suelo
+    soldados/            soldado_aliado_*, soldado_enemigo_*, pose-muerte-aliado y pose-muerte-enemigo (los cráteres)
+    objetivos/           nido_base, nido_arma, deposito, base_suministros (Nivel 2), base_enemiga (Nivel 3), barrera_aliada, botiquin_aire, botiquin_suelo
   ui/
     retratos/            retrato_*, quinones_hablar/parpadeo, layla_hablar/parpadeo, presidente_hablar, yo-pixel
     torre/               torre_fondo, torre_ventana (opcionales, pantalla de Layla)
@@ -237,11 +246,14 @@ Si un archivo del manifiesto no existe, el juego usa un placeholder del mismo ta
 | `sprites/aviones/avion_enemigo.png` | 5 frames de 172x172 (se muestra a 0.55x) | listo |
 | `sprites/armas/explosion.png` | 6 frames de 132x132 | listo |
 | `sprites/objetivos/nido_base.png`, `nido_arma.png` | 132x132 y 40x69 | listo |
-| `sprites/objetivos/deposito.png` | 132x132 | listo |
+| `sprites/objetivos/base_suministros.png` | 264x132 | listo (la base del Nivel 2) |
+| `sprites/objetivos/deposito.png` | 132x132 | respaldo si falta la base del Nivel 2 |
 | `sprites/objetivos/botiquin_aire.png`, `botiquin_suelo.png` | 4 frames de 132 y 132x132 | listo |
 | `sprites/soldado_aliado_*.png` | frames de 72x72 (arriba 5, abajo 6, derecha 7, disparo 4) | listo |
-| `sprites/soldado_enemigo_dispara_*.png` | 4 frames de 72x72 | listo |
-| `sprites/soldados/soldado_enemigo_abajo.png` | 6 frames de 72x72 (caminata) | **falta** |
+| `sprites/soldados/soldado_enemigo_dispara_*.png` | 4 frames de 72x72 | listo |
+| `sprites/soldados/soldado_enemigo_derecha.png` | 7 frames de 72x72 (caminata, a la izquierda se espeja) | listo |
+| `sprites/soldados/pose-muerte-enemigo.png` | 132x132 | listo |
+| `sprites/soldados/soldado_enemigo_abajo.png` | 6 frames de 72x72 (caminata hacia abajo) | **falta**: hasta que exista, los soldados enemigos solo caminan de lado |
 | `ui/retratos/yo-pixel.png` | retrato del autor (Créditos), 1086x1448 | listo |
 | `sprites/armas/bomba.png`, `bala.png` | 16x24 y 8x8 | **falta** |
 | `ui/retrato_*.png` + `quinones_*`, `layla_*`, `presidente_hablar` | 132x132 (hojas de 4 a 7 frames) | listo |
