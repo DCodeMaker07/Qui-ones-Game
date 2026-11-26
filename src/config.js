@@ -13,6 +13,8 @@ export const ESCALA = {
   deposito: 1.3,
   avionEnemigo: 0.55,
   soldado: 0.65,
+  barrera: 0.65, // la barrera de los aliados (132x72)
+  caido: 0.65, // el soldado caído (el dibujo es de 132x132). Igual que el soldado vivo para que los píxeles midan lo mismo
   explosion: 0.8,
   botiquinAire: 0.5,
   botiquinSuelo: 0.35,
@@ -40,7 +42,7 @@ export const VOCES = {
 export const RED = {
   // Con ?. y typeof también se puede importar este archivo desde Node (scripts/guion-voces.mjs), donde no hay import.meta.env ni location
   urlPorDefecto: import.meta.env?.VITE_WS_URL || (typeof location !== 'undefined' && ['localhost', '127.0.0.1'].includes(location.hostname) ? 'ws://localhost:8080' : ''),
-  versionMinima: 3, // el servidor debe hablar al menos este protocolo (si no, está desactualizado: reiniciarlo)
+  versionMinima: 4, // el servidor debe hablar al menos este protocolo (si no, está desactualizado: reiniciarlo)
   envioPorSegundo: 10, // fotos del campo de batalla que el piloto envía a Layla
 };
 
@@ -101,13 +103,16 @@ export const MANIFEST = {
     { key: 'terreno_2', url: 'assets/fondos/terreno_quebrada.png', w: 256, h: 256, color: 0xa86f35 },
     { key: 'terreno_3', url: 'assets/fondos/terreno_base.png', w: 256, h: 256, color: 0x4f7a3a }, // Nivel 3: terreno verdoso
     // Opcionales (si faltan se dibujan por código): río del Nivel 3 (se repite en vertical) y paracaídas del final alternativo
-    { key: 'rio', url: 'assets/fondos/rio.png', w: 200, h: 256, color: 0x2d6f9e, opcional: true },
     { key: 'paracaidas', url: 'assets/sprites/aviones/paracaidas.png', w: 120, h: 120, color: 0xe8e0c8, opcional: true },
     { key: 'palacio', url: 'assets/fondos/palacio_fondo.png', w: 1280, h: 693, color: 0x4a3a2a },
     { key: 'bomba', url: 'assets/sprites/armas/bomba.png', w: 29, h: 71, color: 0x222222 }, // la punta del sprite va ARRIBA: al caer se gira 180° y se dibuja a escala (ver sistemas/efectos/bomba.js)
     { key: 'bala', url: 'assets/sprites/armas/bala.png', w: 19, h: 71, color: 0xffe066 }, // la punta va arriba; se gira hacia donde viaja (ver BALA_ESC)
     { key: 'nido_base', url: 'assets/sprites/objetivos/nido_base.png', w: 132, h: 132, color: 0xd2a679 },
     { key: 'nido_arma', url: 'assets/sprites/objetivos/nido_arma.png', w: 40, h: 69, color: 0x445566 },
+    // La barrera que coloca Layla en el multijugador (opcional: si falta se dibuja un rectángulo)
+    { key: 'barrera_aliada', url: 'assets/sprites/objetivos/barrera_aliada.png', w: 132, h: 72, color: 0x8a6a3a, opcional: true },
+    // La base del Nivel 2 (el depósito de suministros), 264x132. Opcional: si falta, se usa el depósito de abajo (deposito.png)
+    { key: 'base_suministros', url: 'assets/sprites/objetivos/base_suministros.png', w: 264, h: 132, color: 0x6b4a2b, opcional: true },
     { key: 'deposito', url: 'assets/sprites/objetivos/deposito.png', w: 132, h: 132, color: 0x6b4a2b },
     { key: 'botiquin_suelo', url: 'assets/sprites/objetivos/botiquin_suelo.png', w: 132, h: 132, color: 0x88cc88 },
     { key: 'retrato_quinones', url: 'assets/ui/retratos/retrato_quinones.png', w: 132, h: 132, color: 0x35506b },
@@ -121,6 +126,10 @@ export const MANIFEST = {
     // Logos opcionales de la línea de tiempo final (si faltan se dibuja el título con tipografía)
     { key: 'logo_grau', url: 'assets/ui/logos/logo_grau.png', w: 280, h: 120, color: 0x000000, opcional: true },
     { key: 'logo_quinones', url: 'assets/ui/logos/logo_quinones.png', w: 280, h: 120, color: 0x000000, opcional: true },
+    // El cráter donde cae un soldado enemigo al morir (opcional, igual que el del aliado)
+    { key: 'muerte_enemigo', url: 'assets/sprites/soldados/pose-muerte-enemigo.png', w: 132, h: 132, color: 0x6b4a2b, opcional: true },
+    // El cráter donde cae un soldado aliado al morir. Opcional: si falta, el soldado solo desaparece con su explosión
+    { key: 'muerte_aliado', url: 'assets/sprites/soldados/pose-muerte-aliado.png', w: 132, h: 132, color: 0x6b4a2b, opcional: true },
     { key: 'yo_pixel', url: 'assets/ui/retratos/yo-pixel.png', w: 1086, h: 1448, color: 0x333333 }, // retrato del autor (Créditos)
     // Intro (opcionales): si existen, reemplazan al logo dibujado por código. PNG con fondo transparente.
     { key: 'logo', url: 'assets/intro/logo.png', w: 360, h: 200, color: 0x000000, opcional: true },
@@ -151,7 +160,9 @@ export const MANIFEST = {
     { key: 'soldado_aliado_dispara_abajo', url: 'assets/sprites/soldados/soldado_aliado_dispara_abajo.png', fw: 72, fh: 72, frames: 4, color: 0x5a6a85 },
     { key: 'soldado_enemigo_dispara_arriba', url: 'assets/sprites/soldados/soldado_enemigo_dispara_arriba.png', fw: 72, fh: 72, frames: 4, color: 0x7a8a3a },
     { key: 'soldado_enemigo_dispara_abajo', url: 'assets/sprites/soldados/soldado_enemigo_dispara_abajo.png', fw: 72, fh: 72, frames: 4, color: 0x7a8a3a },
-    // Aún sin dibujar: hoja de caminata del soldado enemigo (usa placeholder).
+    // El soldado enemigo caminando hacia la derecha (7 cuadros). Hacia la izquierda se usa el mismo, espejado.
+    { key: 'soldado_enemigo_derecha', url: 'assets/sprites/soldados/soldado_enemigo_derecha.png', fw: 72, fh: 72, frames: 7, color: 0x7a8a3a },
+    // Aún sin dibujar: hoja de caminata del soldado enemigo hacia abajo (usa placeholder y los enemigos no la usan hasta que exista).
     { key: 'soldado_enemigo_abajo', url: 'assets/sprites/soldados/soldado_enemigo_abajo.png', fw: 72, fh: 72, frames: 6, color: 0x7a8a3a },
   ],
   // Audio opcional: si falta el archivo, simplemente no suena.
@@ -195,6 +206,7 @@ export const MANIFEST = {
     { key: 'aliado_dispara_abajo', sheet: 'soldado_aliado_dispara_abajo', rate: 10, repeat: -1 },
     { key: 'enemigo_dispara_arriba', sheet: 'soldado_enemigo_dispara_arriba', rate: 10, repeat: -1 },
     { key: 'enemigo_dispara_abajo', sheet: 'soldado_enemigo_dispara_abajo', rate: 10, repeat: -1 },
-    { key: 'enemigo_caminar', sheet: 'soldado_enemigo_abajo', rate: 8, repeat: -1 },
+    { key: 'enemigo_derecha', sheet: 'soldado_enemigo_derecha', rate: 8, repeat: -1 },
+    { key: 'enemigo_caminar', sheet: 'soldado_enemigo_abajo', rate: 8, repeat: -1 }, // hacia abajo
   ],
 };
