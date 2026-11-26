@@ -1,8 +1,8 @@
 // Los valores fijos del servidor y lo que leo del entorno. Todo lo que quiero ajustar está acá y en ningún otro archivo.
 
-// Versión del protocolo: 2 = mensajes "sync" (historias en paralelo); 3 = "dialogo" (escenas compartidas).
+// Versión del protocolo: 2 = mensajes "sync" (historias en paralelo); 3 = "dialogo" (escenas compartidas); 4 = "barrera" (Layla coloca barreras).
 // El juego se niega a conectarse a un servidor más viejo que su RED.versionMinima.
-export const VERSION = 3;
+export const VERSION = 4;
 
 // Render define PORT solo. ORIGENES_PERMITIDOS es una lista separada por comas; si está vacía acepto a todos.
 export const PUERTO = Number(process.env.PORT) || 8080;
@@ -26,5 +26,5 @@ export const SALA_VIEJA_MS = 6 * 3600 * 1000; // una sala abandonada más de 6 h
 // Qué mensajes le dejo reenviar a cada rol. Todo lo demás se descarta
 export const PERMITIDOS = {
   piloto: new Set(['estado', 'radio', 'evento', 'escena', 'inicio', 'fin', 'sync', 'dialogo']),
-  estratega: new Set(['radio', 'orden', 'marca', 'botiquin', 'refuerzos', 'chat', 'sync', 'dialogo']),
+  estratega: new Set(['radio', 'orden', 'marca', 'botiquin', 'barrera', 'refuerzos', 'chat', 'sync', 'dialogo']),
 };

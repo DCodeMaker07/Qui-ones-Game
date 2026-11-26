@@ -22,7 +22,7 @@ function cliente() {
 try {
   await esperar(600);
   const salud = await fetch(`http://localhost:${puerto}/health`).then((r) => r.json());
-  ok(salud.ok === true && salud.version >= 3, '/health responde y declara su versión');
+  ok(salud.ok === true && salud.version >= 4, '/health responde y declara su versión');
 
   const piloto = cliente();
   const lay = cliente();
