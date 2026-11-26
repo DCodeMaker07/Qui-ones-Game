@@ -1,0 +1,15 @@
+{
+  "name": "quinones-servidor",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servidor de salas por WebSocket para el modo multijugador de 1941: Quebrada Seca (sin dependencias)",
+  "type": "module",
+  "main": "index.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "start": "node index.js",
+    "prueba": "node prueba.mjs && node prueba-protocolo.mjs"
+  }
+}

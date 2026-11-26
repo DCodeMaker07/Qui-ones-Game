@@ -1,0 +1,14 @@
+# Despliegue del servidor multijugador en Render (Blueprint). El juego (carpeta raíz) va aparte en Netlify/Vercel/GitHub Pages.
+# El servidor no tiene dependencias, así que no hay nada que instalar.
+services:
+  - type: web
+    name: quinones-servidor
+    runtime: node
+    rootDir: server
+    plan: free
+    buildCommand: echo "sin dependencias"
+    startCommand: node index.js
+    healthCheckPath: /health
+    # envVars:
+    #   - key: ORIGENES_PERMITIDOS     # opcional: solo acepta conexiones desde tu sitio, p. ej. https://mi-juego.netlify.app
+    #     value: https://mi-juego.netlify.app

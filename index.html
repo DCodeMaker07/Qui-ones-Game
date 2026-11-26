@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>1941: Quebrada Seca</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Nunito:ital,wght@0,200..1000;1,200..1000&display=swap" rel="stylesheet" />
+  </head>
+  <body class="bg-neutral-950 text-neutral-100 min-h-dvh flex items-center justify-center overflow-hidden">
+    <div id="mesh" aria-hidden="true"></div>
+    <div id="game-wrapper" class="relative">
+      <div id="game" class="w-full h-full"></div>
+
+      <!-- Acá va el formulario del DNI. Lo muestro desde DniScene y el estilo está en style.css (.modal-gta) -->
+      <div id="dni-overlay" class="hidden absolute inset-0 z-10 items-center justify-center bg-black/80 p-4">
+        <form id="dni-form" class="modal-gta w-full max-w-sm space-y-4">
+          <h2 class="modal-gta__titulo">Identificación por radio</h2>
+          <p class="text-sm text-neutral-300">
+            Ingresa tu DNI. El género asignado define la voz con la que la torre repite tus órdenes.
+          </p>
+          <input
+            id="dni-input"
+            type="text"
+            inputmode="numeric"
+            maxlength="8"
+            autocomplete="off"
+            placeholder="DNI (8 dígitos)"
+            class="campo-gta w-full text-lg tracking-widest"
+          />
+          <div id="dni-manual" class="hidden">
+            <label for="dni-genero" class="mb-1 block text-sm text-neutral-300">Género (H/M)</label>
+            <select
+              id="dni-genero"
+              class="campo-gta w-full"
+            >
+              <option value="">Selecciona…</option>
+              <option value="H">H (hombre)</option>
+              <option value="M">M (mujer)</option>
+            </select>
+          </div>
+          <p id="dni-error" class="hidden text-sm text-red-400"></p>
+          <p id="dni-hint" class="text-xs text-neutral-500"></p>
+          <button
+            type="submit"
+            class="boton-gta boton-gta--lleno w-full"
+          >
+            Confirmar
+          </button>
+        </form>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
