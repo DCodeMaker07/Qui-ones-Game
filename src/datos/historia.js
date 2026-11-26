@@ -118,7 +118,6 @@ export const ESCENAS = {
   // Entre el final alternativo (paracaídas) y el tributo: aclara que ese final no es la historia real.
   epilogo_alt: {
     fondo: 'terreno_3',
-    rio: true,
     personajes: ['quinones'],
     dramatizada: false,
     dialogo: [
@@ -131,7 +130,7 @@ export const ESCENAS = {
   // Tributo: solo narrador, sin frases inventadas para Quiñones.
   tributo: {
     fondo: 'terreno_3',
-    rio: true, // de fondo: el terreno y el río (la base destruida ya se vio en llamas en la escena del choque)
+    // de fondo solo el terreno (la base destruida ya se vio en llamas en la escena del choque)
     personajes: ['quinones'],
     dramatizada: false,
     musica: 'musica_final', // suena hasta el final de esta escena, en vez de la música de diálogos

@@ -2,7 +2,6 @@ import Phaser from 'phaser';
 import { FUENTE, FUENTE_TITULO, px } from '../../config.js';
 import { ambiente } from '../../sistemas/efectos/Ambiente.js';
 import { crearBaseEnLlamas } from '../../sistemas/efectos/BaseEnLlamas.js';
-import { crearRio } from '../../sistemas/efectos/rio.js';
 
 // FINAL ALTERNATIVO (no histórico): tras la picada, Quiñones se lanza en paracaídas y cae junto al río.
 // Se desbloquea si el jugador pierde pocos soldados en el Nivel 3 (ver Level3Scene). Lleva siempre un cartel que dice que
@@ -18,7 +17,6 @@ export default class FinalAlternativoScene extends Phaser.Scene {
     ambiente.escena('victoria');
     this.cameras.main.fadeIn(900, 0, 0, 0);
     this.fondo = this.add.tileSprite(0, 0, width, height, 'terreno_3').setOrigin(0).setDepth(0);
-    this.rio = crearRio(this, 0.5);
     this.add.rectangle(0, 0, width, height, 0x000000, 0.18).setOrigin(0).setDepth(1);
 
     // La base destruida, a lo lejos, ardiendo: sprite calcinado, muchas llamas, humo y chispas

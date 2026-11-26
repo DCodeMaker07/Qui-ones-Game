@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { ARMA_ORIGEN, INFO } from '../../config.js';
 import { PISTA } from '../efectos/aerodromo.js';
 import { BOMBA } from '../efectos/bomba.js';
-import { paralelogramo } from '../../ui/dibujo.js';
+import { aGris, paralelogramo } from '../../ui/dibujo.js';
 import { COLOR, FUENTE_TITULO, TXT, estiloHud } from '../../ui/tema.js';
 import { deslizar, golpe } from './efectos.js';
 
@@ -74,6 +74,7 @@ function crearAvion(escena, plano, x, y, escala, rotacion = 0, tinte) {
   const sombra = escena.add.sprite(x + SOMBRA.x * escala, y + SOMBRA.y * escala, 'avion_jugador').setScale(escala * 1.05).setRotation(rotacion).setTint(0x000000).setAlpha(0.28);
   const avion = escena.add.sprite(x, y, 'avion_jugador').setScale(escala).setRotation(rotacion);
   if (tinte !== undefined) avion.setTint(tinte);
+  if (escena.registry.get('finalMalo')) aGris(avion); // final histórico: el avión de Quiñones va en gris
   sombra.play('nave_vuelo');
   avion.play('nave_vuelo');
   plano.capas.sombras.add(sombra);
@@ -392,6 +393,7 @@ export function cierre(escena, d) {
   const y = 470;
   const sombra = escena.add.sprite(x, y, 'avion_jugador').setTint(0x000000).setAlpha(0.3);
   const avion = escena.add.sprite(x, y, 'avion_jugador');
+  if (escena.registry.get('finalMalo')) aGris(avion);
   [sombra, avion].forEach((s) => s.play('nave_vuelo'));
   plano.capas.sombras.add(sombra);
   plano.capas.aire.add(avion);

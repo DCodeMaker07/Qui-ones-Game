@@ -128,7 +128,7 @@ export default class PreloadScene extends Phaser.Scene {
       return;
     }
     if (h === '#picada') {
-      this.scene.start('Level3Scene', { probarPicada: true, bajas: 0 }); // Nivel 3 con la base lista para la picada
+      this.scene.start('Level3Scene', { probarPicada: true, puntaje: 99999 }); // Nivel 3 con la base lista para la picada
       return;
     }
     this.listo = true; // la carga terminó: el menú master ya puede saltar de escena

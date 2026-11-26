@@ -1,9 +1,9 @@
+import { aGris } from '../../ui/dibujo.js';
 import Phaser from 'phaser';
 import { FUENTE, VOCES, px } from '../../config.js';
 import { ESCENAS, PERSONAJES, claveVoz, urlVoz } from '../../datos/historia.js';
 import { ambiente } from '../../sistemas/efectos/Ambiente.js';
 import { crearBaseEnLlamas } from '../../sistemas/efectos/BaseEnLlamas.js';
-import { crearRio } from '../../sistemas/efectos/rio.js';
 import { volumen } from '../../sistemas/audio/ajustes.js';
 import { detenerPista, iniciarPista, volumenPista } from '../../sistemas/audio/pistas.js';
 
@@ -100,12 +100,11 @@ export default class CutsceneScene extends Phaser.Scene {
       bg.setScale(Math.max(width / bg.width, height / bg.height));
     } else {
       const fondoTerreno = this.add.tileSprite(0, 0, width, height, def.fondo ?? 'terreno_1').setOrigin(0);
-      if (def.rio || def.baseEnLlamas) {
-        // Terreno y río quietos. Todo con profundidad negativa: los personajes y el cuadro de diálogo de esta escena no
+      if (def.baseEnLlamas) {
+        // Terreno quieto y base en llamas, con profundidad negativa: los personajes y el cuadro de diálogo de esta escena no
         // llevan profundidad (0) y deben quedar por delante.
         fondoTerreno.setDepth(-20);
-        crearRio(this, -19.5);
-        if (def.baseEnLlamas) crearBaseEnLlamas(this, width * 0.7, height * 0.38, 1.2, -19); // opcional: la base destruida de fondo
+        crearBaseEnLlamas(this, width * 0.7, height * 0.38, 1.2, -19); // opcional: la base destruida de fondo
       }
     }
     this.add.rectangle(0, 0, width, height, 0x000000, 0.5).setOrigin(0);
@@ -116,6 +115,7 @@ export default class CutsceneScene extends Phaser.Scene {
     def.personajes.forEach((id, k) => {
       const p = PERSONAJES[id];
       const sprite = this.add.sprite(xs[k], PERSONAJE_Y, p.reposo).setDisplaySize(PERSONAJE_TAM, PERSONAJE_TAM).setAlpha(0.5);
+      if (id === 'quinones' && this.registry.get('finalMalo')) aGris(sprite); // en el final histórico Quiñones ya murió: se ve gris
       this.pers[id] = { p, sprite, escala: sprite.scaleX };
     });
 
