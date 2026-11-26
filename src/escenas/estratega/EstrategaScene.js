@@ -81,7 +81,7 @@ export default class EstrategaScene extends Phaser.Scene {
     this.estado = null;
     this.tUltimo = 0;
     this.vel = 0;
-    this.fichas = { o: new Map(), e: new Map(), s: new Map(), a: new Map(), b: new Map(), m: new Map() };
+    this.fichas = { o: new Map(), e: new Map(), s: new Map(), a: new Map(), b: new Map(), r: new Map(), m: new Map() };
     this.herramienta = 'marca-bomba';
     this.registroRadio = [];
     this.pideRefuerzos = false;
@@ -291,9 +291,9 @@ export default class EstrategaScene extends Phaser.Scene {
     this.botones.atacar = this.boton(col3(2), P.y + 262, ancho3, 30, 'Atacar…', () => this.seleccionarHerramienta('atacar'));
 
     titulo(P.y + 300, 'APOYO');
-    const ancho2 = (P.w - 28 - 10) / 2;
-    this.botones.botiquin = this.boton(P.x + 14, P.y + 316, ancho2, 32, 'Botiquín (elige dónde)', () => this.seleccionarHerramienta('botiquin'));
-    this.botones.refuerzos = this.boton(P.x + 14 + ancho2 + 10, P.y + 316, ancho2, 32, 'Enviar refuerzos', () => this.enviarRefuerzos());
+    this.botones.botiquin = this.boton(col3(0), P.y + 316, ancho3, 32, 'Botiquín…', () => this.seleccionarHerramienta('botiquin'));
+    this.botones.barrera = this.boton(col3(1), P.y + 316, ancho3, 32, 'Barrera…', () => this.seleccionarHerramienta('barrera'));
+    this.botones.refuerzos = this.boton(col3(2), P.y + 316, ancho3, 32, 'Refuerzos', () => this.enviarRefuerzos());
 
     // Pantalla ámbar: la radio
     titulo(P.y + 358, 'RADIO');
@@ -420,6 +420,7 @@ export default class EstrategaScene extends Phaser.Scene {
     });
     this.sincronizar('a', s.a, () => this.fichaSprite('soldado_aliado_arriba', 0.3, 0, false));
     this.sincronizar('b', s.b, () => this.fichaSprite('botiquin_suelo', 0.14, 0, false));
+    this.sincronizar('r', s.r ?? [], () => this.fichaSprite(this.textures.exists('barrera_aliada') ? 'barrera_aliada' : 'botiquin_suelo', 0.27, 0, false)); // las barreras de los aliados
     this.sincronizar('m', s.m, (f) => this.fichaMarca(f));
     this.fuegos = (s.fu ?? []).map(([x, y]) => ({ x, y }));
 
@@ -433,6 +434,8 @@ export default class EstrategaScene extends Phaser.Scene {
     );
     this.pintarBarraKm(s.prog ?? 0);
     this.botones.botiquin.habilitado = s.bq > 0 && s.esp <= 0;
+    this.botones.barrera.habilitado = (s.br ?? 0) > 0 && (s.bre ?? 0) <= 0;
+    this.botones.barrera.txt.setText(`Barrera (${s.br ?? 0})`);
     this.botones.refuerzos.habilitado = s.fase === 'base' && !s.ref;
     this.botones.refuerzos.activo = this.pideRefuerzos && s.fase === 'base' && !s.ref;
     Object.values(this.botones).forEach((b) => b.pintar());
@@ -604,7 +607,7 @@ export default class EstrategaScene extends Phaser.Scene {
 
   seleccionarHerramienta(h) {
     this.herramienta = h;
-    ['marca-bomba', 'marca-peligro', 'marca-aliados', 'botiquin', 'atacar'].forEach((k) => {
+    ['marca-bomba', 'marca-peligro', 'marca-aliados', 'botiquin', 'barrera', 'atacar'].forEach((k) => {
       this.botones[k].activo = k === h;
       this.botones[k].pintar();
     });
@@ -614,6 +617,7 @@ export default class EstrategaScene extends Phaser.Scene {
         'marca-peligro': 'Herramienta: marca PELIGRO. Clic en el mapa',
         'marca-aliados': 'Herramienta: marca ALIADOS AQUÍ. Clic en el mapa',
         botiquin: 'Botiquín: haz clic en el mapa donde quieres que caiga (dentro de la pantalla del piloto)',
+        barrera: 'Barrera: haz clic en el mapa donde la quieres. Frena las balas de las torretas y de los soldados enemigos',
         atacar: 'Atacar: haz clic en un nido o en la base para que los soldados vayan a atacarlo',
       }[h]
     );
@@ -641,6 +645,12 @@ export default class EstrategaScene extends Phaser.Scene {
       if (wy < 0 || wy > GAME.height) return this.agregarRadio('sistema', 'El botiquín debe caer dentro de la pantalla del piloto.');
       this.red.enviar({ t: 'botiquin', x: wx, y: wy });
       this.agregarRadio('sistema', 'Botiquín enviado.');
+      return this.seleccionarHerramienta('marca-bomba');
+    }
+    if (this.herramienta === 'barrera') {
+      if (wy < 0 || wy > GAME.height) return this.agregarRadio('sistema', 'La barrera debe quedar dentro de la pantalla del piloto.');
+      this.red.enviar({ t: 'barrera', x: wx, y: wy });
+      this.agregarRadio('sistema', 'Barrera colocada.');
       return this.seleccionarHerramienta('marca-bomba');
     }
     this.red.enviar({ t: 'marca', tipo: this.herramienta.replace('marca-', ''), x: wx, y: wy });
