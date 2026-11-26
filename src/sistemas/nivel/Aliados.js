@@ -1,14 +1,14 @@
 import Phaser from 'phaser';
 import { alinearAliado, ESCALA } from '../../config.js';
-import { DANO_ALIADO_NIDO, DANO_ALIADO_SOLDADO, FUEGO_BLOQUEO, FUEGO_DANO_ALIADO, FUEGO_RADIO, VIDA_ALIADO } from './constantes.js';
+import { PUNTOS, DANO_ALIADO_NIDO, DANO_ALIADO_SOLDADO, FUEGO_BLOQUEO, FUEGO_DANO_ALIADO, FUEGO_RADIO, VIDA_ALIADO } from './constantes.js';
 
 // Mis soldados aliados. Llegan en escuadras de 3 por abajo cuando el mapa se frena ante las torretas y marchan a atacarlas.
-// Los heridos buscan un botiquín. Layla les puede dar órdenes (avanzar, mantener, atacar un objetivo).
+// Los heridos buscan un botiquín. El fuego grande de la R los detiene y el chico lo rodean. Layla les puede dar órdenes (avanzar, mantener, atacar un objetivo).
 export default class Aliados {
   constructor(escena) {
     this.escena = escena;
     this.orden = { tipo: 'avanzar', id: null };
-    this.bajas = escena.scene.settings.data?.bajas ?? 0; // las bajas deciden si se desbloquea el final alternativo
+    this.bajas = 0; // cuántos soldados perdí (cada baja resta puntos)
   }
 
   crearEscuadra() {
@@ -36,7 +36,9 @@ export default class Aliados {
     a.vida--;
     if (a.vida <= 0) {
       this.bajas++;
+      this.escena.puntaje.sumar(-PUNTOS.baja, a.x, a.y); // cada soldado que cae resta puntos
       this.escena.explosion(a.x, a.y, 0.35);
+      this.escena.caidos.marcar('muerte_aliado', a.x, a.y);
       a.destroy();
     }
   }
@@ -135,9 +137,15 @@ export default class Aliados {
       } else if (mov.relX || mov.relY) {
         const largo = Math.hypot(mov.relX, mov.relY);
         const adelante = e.especial.fuegoCerca(a.x + (mov.relX / largo) * FUEGO_BLOQUEO, a.y + (mov.relY / largo) * FUEGO_BLOQUEO, FUEGO_RADIO + 10);
-        if (adelante) {
+        if (adelante && e.especial.fuegoBloqueante()) {
+          // Un muro de fuego: se paran y esperan a que lo apaguen
           mov = { relX: 0, relY: 0, anim: 'aliado_arriba', flip: false };
           quieto = true;
+        } else if (adelante) {
+          // Un parche chico: lo rodean, girando el rumbo hacia el lado contrario al fuego
+          const rumbo = Math.atan2(mov.relY, mov.relX);
+          const lejos = Phaser.Math.Angle.Between(adelante.x, adelante.y, a.x, a.y);
+          mov = this.direccion(Phaser.Math.Angle.RotateTo(rumbo, lejos, Math.PI / 2.5), largo);
         }
       }
 

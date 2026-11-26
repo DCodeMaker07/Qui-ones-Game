@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { ESCALA } from '../../config.js';
 import { ambiente } from '../efectos/Ambiente.js';
 import { playSfx } from '../audio/audio.js';
-import { BALA_ESC, ENEMIGO_REACCION, FACTOR_ALTURA, MAX_AVIONES } from './constantes.js';
+import { AVIONES_OLEADA, BALA_ESC, ENEMIGO_REACCION, ESPERA_OLEADA, ESPERA_PRIMERA_OLEADA, FACTOR_ALTURA, MAX_AVIONES, PUNTOS } from './constantes.js';
 
 // Los aviones enemigos. Entran por arriba (o despegan de la base), se meten en la pantalla y se quedan patrullando mientras
 // queden torretas o la base: vuelan de un punto a otro de la mitad de arriba, girando suave, y le disparan a mi avión.
@@ -16,6 +16,34 @@ const escalaSegunAltura = (nivel) => ESCALA.avionEnemigo * FACTOR_ALTURA[nivel];
 export default class Enemigos {
   constructor(escena) {
     this.escena = escena;
+    this.espera = ESPERA_PRIMERA_OLEADA; // segundos que faltan para la próxima oleada (solo corren cuando no queda ningún avión)
+    this.pendientes = 0; // aviones de la oleada que todavía no salieron
+    this.hastaSiguiente = 0; // segundos para que salga el próximo avión de la oleada
+  }
+
+  // Las oleadas: cuando no queda ningún avión y pasó la espera, sale un grupo de 2 o 3, uno cada 1,2 s. Mientras quede alguno vivo el reloj
+  // de la espera no corre, así que empieza a contar recién cuando derroto al último. Sin torretas ni base no vienen más.
+  manejarOleadas(dt, defendido) {
+    const e = this.escena;
+    if (e.terminado || !defendido) return;
+    if (this.pendientes > 0) {
+      this.hastaSiguiente -= dt;
+      if (this.hastaSiguiente > 0) return;
+      this.hastaSiguiente = 1.2;
+      this.pendientes--;
+      if (e.fase === 'avance') this.crear();
+      else this.salirDeBase();
+      return;
+    }
+    if (e.enemigos.countActive(true) > 0) {
+      this.espera = ESPERA_OLEADA;
+      return;
+    }
+    this.espera -= dt;
+    if (this.espera <= 0) {
+      this.pendientes = Phaser.Math.Between(...AVIONES_OLEADA);
+      this.hastaSiguiente = 0;
+    }
   }
 
   crear() {
@@ -70,6 +98,7 @@ export default class Enemigos {
     avion.vida -= n;
     if (avion.vida <= 0) {
       e.explosion(avion.x, avion.y);
+      e.puntaje.sumar(PUNTOS.avion, avion.x, avion.y);
       avion.destroy();
     } else {
       avion.setTint(0xff9999);
@@ -105,6 +134,7 @@ export default class Enemigos {
     const dt = delta / 1000;
     const { width, height } = e.scale;
     const defendido = e.objetivos.some((o) => o.activo && (o.arma || o.jefe)); // quedan torretas o la base
+    this.manejarOleadas(dt, defendido);
     const miNivel = e.altura.nivel;
     // Las balas de otra altura pasan por debajo (o por encima) de mí: se ven transparentes para saber que no me tocan
     e.balasEnemigas.getChildren().forEach((b) => b.setAlpha(b.nivel === miNivel ? 1 : 0.3));

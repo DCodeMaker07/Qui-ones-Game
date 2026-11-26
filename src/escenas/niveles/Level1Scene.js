@@ -7,7 +7,6 @@ export default class Level1Scene extends LevelScene {
       terreno: 'terreno_1',
       entreOleadas: 420, // píxeles de terreno que recorro sin torretas antes de que salga el siguiente grupo
       oleada: [1, 2], // torretas por grupo (mín., máx.)
-      cadaEnemigo: 3, // segundos entre aviones enemigos
       cadaEscuadra: 9, // segundos entre una escuadra aliada y otra
       meta: 6,
       jefeEn: null,

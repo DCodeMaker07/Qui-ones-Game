@@ -41,9 +41,10 @@ export default class Altura {
   actualizar(dt) {
     this.espera = Math.max(0, this.espera - dt);
     const j = this.escena.jugador;
-    j.setScale(ESCALA_JUGADOR * this.factor);
+    const grande = ESCALA_JUGADOR * this.factor;
+    j.setScale(grande * this.escena.habilidades.escalaTonel, grande); // en el tonel se achata de lado a lado y se da vuelta
     // La sombra se aleja del avión mientras más alto va: de 0 (el piso más bajo) a 1 (el más alto)
     const altura = (this.factor - FACTOR_ALTURA[-1]) / (FACTOR_ALTURA[1] - FACTOR_ALTURA[-1]);
-    this.sombra.setVisible(j.visible).setScale(j.scale * 1.02).setRotation(j.rotation).setPosition(j.x + 4 + 26 * altura, j.y + 6 + 38 * altura);
+    this.sombra.setVisible(j.visible).setScale(Math.abs(j.scaleX) * 1.02, j.scaleY * 1.02).setRotation(j.rotation).setPosition(j.x + 4 + 26 * altura, j.y + 6 + 38 * altura);
   }
 }

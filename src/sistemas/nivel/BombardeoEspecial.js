@@ -3,14 +3,15 @@ import { ambiente } from '../efectos/Ambiente.js';
 import { playSfx } from '../audio/audio.js';
 import { bombaCayendo } from '../efectos/bomba.js';
 import {
-  FUEGO_APILA_MAX, FUEGO_APILA_RADIO, FUEGO_DPS, FUEGO_RADIO, TECLAS, ULTI_CADA, ULTI_DANO_BOMBA, ULTI_DURACION, ULTI_ESPERA, ULTI_FACTOR_JEFE, ULTI_RADIO_BOMBA,
+  FUEGO_APILA_MAX, FUEGO_APILA_RADIO, FUEGO_DPS, FUEGO_MIN_BLOQUEO, FUEGO_RADIO, TECLAS, ULTI_CADA, ULTI_DANO_BOMBA, ULTI_DURACION, ULTI_ESPERA, ULTI_FACTOR_JEFE, ULTI_RADIO_BOMBA,
 } from './constantes.js';
 
 // Mi habilidad especial (tecla R): un bombardeo de fuego. Durante 1,5 s voy soltando bombas donde caerían las normales y
 // "dibujo" la línea de fuego con mi vuelo. Cada bomba pega con su propio daño a lo que tenga cerca y además enciende un foco
 // de fuego en el suelo.
 //   - El fuego NO se apaga solo: se queda donde cayó hasta que lo apago con agua (F).
-//   - Mientras haya fuego el mapa no avanza, porque mis soldados no pasan por las llamas y se queman si están dentro.
+//   - Mientras haya fuego grande (FUEGO_MIN_BLOQUEO focos o más) el mapa no avanza, porque mis soldados no pasan por las llamas y se
+//     queman si están dentro. Si el fuego es chico, no frena nada: mis soldados lo rodean.
 //   - Una torreta que toca el fuego se prende para siempre: su quemadura va haciendo más daño cada segundo (ver Objetivo.js).
 //   - Si varias bombas caen en el mismo lugar el fuego se apila: llama más grande y humo.
 export default class BombardeoEspecial {
@@ -28,6 +29,12 @@ export default class BombardeoEspecial {
 
   hayFuego() {
     return this.fuegos.length > 0;
+  }
+
+  // Solo el fuego grande (una pasada entera de la R) frena el mapa y a mis soldados. Un parche chico no: se queda donde cayó, baja con el
+  // terreno y mis soldados lo rodean
+  fuegoBloqueante() {
+    return this.fuegos.length >= FUEGO_MIN_BLOQUEO;
   }
 
   // El foco de fuego más cercano a (x, y) que esté a menos de "radio", o null
@@ -126,7 +133,7 @@ export default class BombardeoEspecial {
 
   // El aviso grande de arriba: se muestra mientras quede fuego y se quita cuando se apaga todo
   actualizarAviso() {
-    const hay = this.hayFuego();
+    const hay = this.fuegoBloqueante();
     if (hay === this.avisado) return;
     this.avisado = hay;
     if (hay) this.escena.hud.mostrarAviso('fuego', `EL FUEGO BLOQUEA A TUS ALIADOS\nAPÁGALO CON AGUA (${TECLAS.agua})`, '#ff9a4a');

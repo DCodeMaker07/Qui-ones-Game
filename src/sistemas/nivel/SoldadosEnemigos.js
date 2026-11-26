@@ -1,12 +1,14 @@
 import Phaser from 'phaser';
 import { ESCALA } from '../../config.js';
-import { FUEGO_DPS, FUEGO_RADIO } from './constantes.js';
+import { FILA_SEPARACION, FILA_SOLDADOS, FUEGO_DPS, FUEGO_RADIO, PUNTOS } from './constantes.js';
 
 // Los soldados enemigos de tierra. Cuidan las torretas y la base: se quedan en su puesto, se mueven con el terreno y les disparan
 // a mis soldados aliados cuando los tienen a tiro. Mi avión no es su blanco (eso es cosa de los aviones enemigos). A ellos los
 // derrotan mis soldados (disparando), mis bombas (Q) y el fuego de la R.
 const VIDA = 2;
 const ALCANCE = 260; // distancia a la que ven a un aliado (un poco más que los 230 desde los que mis soldados les disparan)
+const VELOCIDAD = 38; // píxeles por segundo cuando caminan hacia un aliado
+const DISTANCIA_TIRO = 170; // se acercan hasta quedar a esta distancia
 const ESPERA_MS = [1500, 2400]; // tiempo entre un disparo y el siguiente. Lo subí porque mis soldados se estaban muriendo mucho
 
 export default class SoldadosEnemigos {
@@ -32,6 +34,27 @@ export default class SoldadosEnemigos {
     s.idRed = e.nuevoId();
     this.lista.push(s);
     return s;
+  }
+
+  // Una fila (horizontal) o una columna (vertical) de soldados, para que el bombardeo de fuego (R) los barra de una pasada. Si el
+  // mapa está avanzando, entran por arriba; si está detenido aparecen ya en pantalla, con un fundido
+  fila() {
+    const e = this.escena;
+    const { width } = e.scale;
+    const parado = e.velTerreno < 5;
+    const horizontal = Math.random() < 0.5;
+    const largo = FILA_SEPARACION * (FILA_SOLDADOS - 1);
+    const x0 = Phaser.Math.Between(120, width - 120 - (horizontal ? largo : 0));
+    for (let i = 0; i < FILA_SOLDADOS; i++) {
+      const x = horizontal ? x0 + i * FILA_SEPARACION : x0;
+      const y = horizontal ? (parado ? 70 : -30) : (parado ? 40 : -30 - largo) + i * FILA_SEPARACION;
+      const s = this.crear(x, y);
+      if (parado) {
+        s.setAlpha(0);
+        e.tweens.add({ targets: s, alpha: 1, duration: 500 });
+      }
+    }
+    e.radio.mostrar('Layla: ¡Una fila de soldados enemigos! Un bombardeo de fuego los barre de una pasada.', { duracion: 4500 });
   }
 
   // El aliado más cercano dentro del alcance, o null
@@ -64,6 +87,27 @@ export default class SoldadosEnemigos {
     return mejor;
   }
 
+  // Si el aliado está lejos, el soldado camina hacia él mientras sigue disparando. Devuelve false si no se movió. Tengo dibujo de caminata
+  // hacia la derecha (a la izquierda es el mismo, espejado) y, hacia abajo, solo cuando exista soldado_enemigo_abajo.png; hacia arriba no hay
+  caminar(s, blanco, angulo, dt) {
+    const e = this.escena;
+    const dx = blanco.x - s.x;
+    const dy = blanco.y - s.y;
+    if (Math.hypot(dx, dy) <= DISTANCIA_TIRO) return false;
+    const deLado = Math.abs(dx) >= Math.abs(dy);
+    if (!deLado && !(dy > 0 && this.hayCaminataHaciaAbajo())) return false;
+    s.x += Math.cos(angulo) * VELOCIDAD * dt;
+    s.y += Math.sin(angulo) * VELOCIDAD * dt;
+    s.setFlipX(deLado && dx < 0);
+    s.anims.play(deLado ? 'enemigo_derecha' : 'enemigo_caminar', true);
+    return true;
+  }
+
+  hayCaminataHaciaAbajo() {
+    const textura = this.escena.textures.get('soldado_enemigo_abajo');
+    return !!textura && !textura.customData?.placeholder;
+  }
+
   // Daño de golpe (con destello): lo uso para las explosiones
   recibirDano(s, n) {
     if (!s.active) return;
@@ -81,6 +125,8 @@ export default class SoldadosEnemigos {
 
   matar(s) {
     this.escena.explosion(s.x, s.y, 0.35);
+    this.escena.puntaje.sumar(PUNTOS.soldado, s.x, s.y);
+    this.escena.caidos.marcar('muerte_enemigo', s.x, s.y);
     s.destroy();
   }
 
@@ -110,11 +156,15 @@ export default class SoldadosEnemigos {
       const blanco = this.blancoDe(s);
       if (!blanco) {
         s.anims.stop();
+        s.setFlipX(false);
         s.setTexture('soldado_enemigo_dispara_abajo', 0); // sin blanco se quedan quietos mirando hacia abajo
         return;
       }
       const angulo = Phaser.Math.Angle.Between(s.x, s.y, blanco.x, blanco.y);
-      s.anims.play(blanco.y >= s.y ? 'enemigo_dispara_abajo' : 'enemigo_dispara_arriba', true);
+      if (!this.caminar(s, blanco, angulo, dt)) {
+        s.setFlipX(false);
+        s.anims.play(blanco.y >= s.y ? 'enemigo_dispara_abajo' : 'enemigo_dispara_arriba', true);
+      }
       s.cooldown -= dt * 1000;
       if (s.cooldown <= 0) {
         s.cooldown = Phaser.Math.Between(...ESPERA_MS);

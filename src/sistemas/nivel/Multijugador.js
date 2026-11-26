@@ -47,6 +47,7 @@ export default class Multijugador {
       marca: (m) => this.alMarcaDeLayla(m),
       orden: (m) => this.alOrdenDeLayla(m),
       botiquin: (m) => e.botiquin.pedir({ x: m.x, y: m.y }),
+      barrera: (m) => e.barreras.colocar(Phaser.Math.Clamp(Number(m.x) || 0, 20, e.scale.width - 20), Phaser.Math.Clamp(Number(m.y) || 0, 40, e.scale.height - 40)),
       refuerzos: () => e.fase === 'base' && e.baseEnemiga.llamarRefuerzos(false),
       companero: (m) => !m.conectado && e.radio.mostrar('Layla se desconectó: vuelve la asistente automática.', { duracion: 4500 }),
     };
@@ -198,6 +199,9 @@ export default class Multijugador {
       e: e.enemigos.getChildren().map((a) => [a.idRed, r(a.x), r(a.y)]),
       a: e.aliados.getChildren().map((a) => [a.idRed, r(a.x), r(a.y), a.vida]),
       s: e.soldadosEnemigos.foto(), // soldados enemigos
+      r: e.barreras.foto(), // barreras de los aliados
+      br: e.barreras.restantes,
+      bre: e.barreras.esperaRestante(),
       b: e.botiquin.lista.filter((b) => b.active && b.estado === 'suelo').map((b) => [b.idRed, r(b.x), r(b.y)]),
       m: this.marcas.map((m) => [m.id, m.tipo, r(m.x), r(m.y)]),
       bq: e.botiquin.restantes,

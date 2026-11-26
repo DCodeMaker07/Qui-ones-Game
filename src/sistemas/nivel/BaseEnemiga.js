@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { ESCALA, GAME } from '../../config.js';
 import Objetivo from '../../entidades/Objetivo.js';
 import { ambiente } from '../efectos/Ambiente.js';
-import { PX_POR_KM, TECLAS } from './constantes.js';
+import { ESPERA_PRIMERA_OLEADA, PX_POR_KM, TECLAS } from './constantes.js';
 
 // La base enemiga de los niveles 2 y 3. Aparece cuando recorrí cierta distancia, el terreno se frena cuando queda en el centro,
 // se arman las defensas, los aviones salen de ella y yo pido refuerzos por radio (o llegan solos si no puedo hablar).
@@ -85,9 +85,8 @@ export default class BaseEnemiga {
 
     // Las defensas fijas rodean la base
     (e.cfg.defensas ?? [[-300, -50], [300, -50], [-330, 110], [330, 110]]).forEach(([dx, dy]) => this.crearNidoFijo(b.x + dx, b.y + dy));
-    // Y los aviones salen de la base cada tanto
-    e.time.addEvent({ delay: 2400, loop: true, callback: () => e.aviones.salirDeBase() });
-    e.aviones.salirDeBase();
+    e.aviones.espera = ESPERA_PRIMERA_OLEADA; // los aviones de la base también salen en oleadas (ver Enemigos)
+    e.puntoDeControl.guardar(); // llegué a la base: este es el punto de control
 
     e.radio.mostrar(`Encontraste la base. Pulsa ${TECLAS.radio} y pide refuerzos: "Encontré la ubicación, necesito refuerzos".`, { duracion: 9000 });
     e.hud.mostrarAviso('refuerzos', `PULSA ${TECLAS.radio} Y DI:\n"ENCONTRÉ LA UBICACIÓN, NECESITO REFUERZOS"`);

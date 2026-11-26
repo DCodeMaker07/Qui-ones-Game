@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { ESCALA, GAME } from '../../config.js';
 import Objetivo from '../../entidades/Objetivo.js';
-import { LINEA_PARADA } from './constantes.js';
+import { FILA_CADA, FILA_PRIMERA, LINEA_PARADA, MAX_SOLDADOS_ENEMIGOS } from './constantes.js';
 
 // Cómo avanza el mapa. Va bajando mientras no haya torretas; cuando aparece un grupo y llega cerca del centro, el mapa
 // frena (con una frenada suave) y no se mueve hasta que las destruyo todas. Entre grupo y grupo cuento el terreno que recorro
@@ -12,6 +12,8 @@ export default class Avance {
     this.tNivel = 0; // segundos de avance, para calcular los km que faltan hasta la base
     this.recorrido = (escena.cfg.entreOleadas ?? 420) - 240; // la primera oleada sale enseguida
     this.estabaParado = false;
+    this.tuvoTorretas = false; // para detectar el momento en que despejo un grupo
+    this.hastaFila = FILA_PRIMERA; // segundos para la próxima fila de soldados enemigos
     this.torretasVivas = 0;
     this.textoAviso = '';
   }
@@ -23,17 +25,31 @@ export default class Avance {
     // El progreso hacia la base depende del terreno que recorro: con el mapa frenado no avanza
     if (e.fase === 'avance') this.tNivel += dt * (e.velTerreno / GAME.scrollSpeed);
     this.generarOleadas(dt);
+    this.generarFilas(dt);
+  }
+
+  // De vez en cuando sale una fila de soldados enemigos (ver SoldadosEnemigos.fila), solo durante el avance y si no hay demasiados
+  generarFilas(dt) {
+    const e = this.escena;
+    if (e.terminado || e.fase !== 'avance' || e.depositoCreado) return;
+    this.hastaFila -= dt;
+    if (this.hastaFila > 0) return;
+    this.hastaFila = Phaser.Math.Between(...FILA_CADA);
+    if (e.soldadosEnemigos.lista.length < MAX_SOLDADOS_ENEMIGOS) e.soldadosEnemigos.fila();
   }
 
   frenarPorTorretas(dt) {
     const e = this.escena;
     const torretas = e.objetivos.filter((o) => o.activo && o.arma);
     this.torretasVivas = torretas.length;
+    // Cuando despejo un grupo de torretas guardo el punto de control
+    if (this.tuvoTorretas && torretas.length === 0 && e.fase === 'avance') e.puntoDeControl.guardar();
+    this.tuvoTorretas = torretas.length > 0;
     if (e.fase !== 'avance' || e.baseEnemiga.frenando) return this.ocultarAviso();
 
     // El mapa se frena cuando las torretas llegan al centro y también mientras haya fuego de la R en pantalla: mis soldados
     // no pasan por las llamas, así que no se avanza hasta que lo apague con agua
-    const fuego = e.especial.hayFuego();
+    const fuego = e.especial.fuegoBloqueante();
     const detener = fuego || (torretas.length > 0 && torretas.every((o) => o.y >= LINEA_PARADA));
     const meta = detener ? 0 : GAME.scrollSpeed;
     const paso = (GAME.scrollSpeed / 0.7) * dt; // arranca y frena en 0,7 s

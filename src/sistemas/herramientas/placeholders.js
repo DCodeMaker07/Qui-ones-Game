@@ -36,6 +36,7 @@ export function crearPlaceholder(scene, { key, w, h, fw, fh, frames = 1, color }
     }
   }
   tex.refresh();
+  tex.customData.placeholder = true; // para saber que todavía no hay dibujo de verdad (lo usan los soldados enemigos)
   if (frames > 1) {
     for (let i = 0; i < frames; i++) tex.add(i, 0, i * cw, 0, cw, ch);
   }

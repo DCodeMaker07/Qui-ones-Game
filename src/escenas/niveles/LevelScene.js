@@ -6,8 +6,10 @@ import { volMusica } from '../../sistemas/audio/ajustes.js';
 import Aliados from '../../sistemas/nivel/Aliados.js';
 import Altura from '../../sistemas/nivel/Altura.js';
 import Avance from '../../sistemas/nivel/Avance.js';
+import Barreras from '../../sistemas/nivel/Barreras.js';
 import BaseEnemiga from '../../sistemas/nivel/BaseEnemiga.js';
 import BombardeoEspecial from '../../sistemas/nivel/BombardeoEspecial.js';
+import Caidos from '../../sistemas/nivel/Caidos.js';
 import Botiquines from '../../sistemas/nivel/Botiquines.js';
 import Enemigos from '../../sistemas/nivel/Enemigos.js';
 import GuiaBomba from '../../sistemas/nivel/GuiaBomba.js';
@@ -16,9 +18,11 @@ import Hud from '../../ui/nivel/Hud.js';
 import MenuPausa from '../../ui/nivel/MenuPausa.js';
 import Multijugador from '../../sistemas/nivel/Multijugador.js';
 import Picada from '../../sistemas/nivel/Picada.js';
+import PuntoDeControl from '../../sistemas/nivel/PuntoDeControl.js';
+import Puntaje from '../../sistemas/nivel/Puntaje.js';
 import Radio from '../../ui/nivel/Radio.js';
 import SoldadosEnemigos from '../../sistemas/nivel/SoldadosEnemigos.js';
-import { ESCALA_JUGADOR, GIRO_JUGADOR, TECLAS, VELOCIDAD_JUGADOR, VIDA_JUGADOR } from '../../sistemas/nivel/constantes.js';
+import { BALA_ESC, ESCALA_JUGADOR, GIRO_JUGADOR, PUNTOS, TECLAS, TONEL_SALTO, VELOCIDAD_JUGADOR, VIDA_JUGADOR } from '../../sistemas/nivel/constantes.js';
 
 // La escena base de los niveles (shooter vertical con scroll). Cada nivel solo pasa su configuración (ver Level1Scene,
 // Level2Scene y Level3Scene). Acá dejo lo central: el jugador, los controles, las colisiones, el daño y el bucle principal.
@@ -90,6 +94,8 @@ export default class LevelScene extends Phaser.Scene {
     this.botiquin = new Botiquines(this);
     this.soldados = new Aliados(this);
     this.soldadosEnemigos = new SoldadosEnemigos(this);
+    this.caidos = new Caidos(this);
+    this.barreras = new Barreras(this);
     this.aviones = new Enemigos(this);
     this.especial = new BombardeoEspecial(this);
     this.habilidades = new Habilidades(this);
@@ -97,6 +103,9 @@ export default class LevelScene extends Phaser.Scene {
     this.picada = new Picada(this);
     this.multijugador = new Multijugador(this);
     this.menuPausa = new MenuPausa(this);
+    this.puntaje = new Puntaje(this);
+    this.puntoDeControl = new PuntoDeControl(this);
+    this.puntoDeControl.restaurar(); // si vengo de "Continuar desde el punto", retomo el avance guardado
     this.hud = new Hud(this);
     if (this.registry.get('invencible')) this.hud.etiquetaPrueba('MODO PRUEBA: AVIÓN INVENCIBLE');
   }
@@ -142,6 +151,7 @@ export default class LevelScene extends Phaser.Scene {
     this.physics.add.overlap(
       this.jugador, this.balasEnemigas,
       (_j, bala) => {
+        if (this.habilidades.enTonel) return this.devolverBala(bala); // durante el tonel las balas rebotan
         bala.destroy();
         this.danoJugador();
       },
@@ -155,6 +165,7 @@ export default class LevelScene extends Phaser.Scene {
       this.jugador, this.enemigos,
       (_j, avion) => {
         this.explosion(avion.x, avion.y);
+        if (this.habilidades.enTonel) this.puntaje.sumar(PUNTOS.avion, avion.x, avion.y); // girando no me hace daño y el choque lo destruye
         avion.destroy();
         this.danoJugador();
       },
@@ -162,9 +173,9 @@ export default class LevelScene extends Phaser.Scene {
     );
   }
 
-  // Las torretas y la base no salen por tiempo sino por distancia recorrida (ver Avance y BaseEnemiga)
+  // Las torretas y la base no salen por tiempo sino por distancia recorrida (ver Avance y BaseEnemiga) y los aviones enemigos vienen
+  // en oleadas (ver Enemigos). Acá solo programo los soldados aliados
   programarSpawns() {
-    this.time.addEvent({ delay: this.cfg.cadaEnemigo * 1000, loop: true, callback: () => this.aviones.crear() });
     this.time.addEvent({ delay: this.cfg.cadaEscuadra * 1000, loop: true, callback: () => this.soldados.crearEscuadra() });
   }
 
@@ -240,6 +251,7 @@ export default class LevelScene extends Phaser.Scene {
   alDestruirObjetivo(o) {
     this.explosion(o.x, o.y, o.jefe ? 1.8 : 1.2);
     this.destruidos++;
+    this.puntaje.sumar(o.jefe ? PUNTOS.base : PUNTOS.nido, o.x, o.y);
     ambiente.pulso('#ffd35a', 700, 0);
     const gana = o.jefe || (this.cfg.meta && this.destruidos >= this.cfg.meta);
     if (gana) this.terminarNivel();
@@ -254,6 +266,8 @@ export default class LevelScene extends Phaser.Scene {
   }
 
   terminarNivel() {
+    this.puntaje.bonoDeNivel(); // antes de marcar el nivel como terminado, para que cuente las vidas que me quedan
+    this.puntoDeControl.borrar();
     this.terminado = true;
     this.physics.pause();
     this.time.delayedCall(1500, () => this.scene.start('CutsceneScene', { id: this.cfg.escenaFinal }));
@@ -292,6 +306,8 @@ export default class LevelScene extends Phaser.Scene {
 
     this.soldados.actualizar(dt);
     this.soldadosEnemigos.actualizar(dt);
+    this.caidos.actualizar(dt);
+    this.barreras.actualizar(dt);
     this.botiquin.actualizar(dt);
     this.aviones.actualizar(delta);
     this.limpiarBalas();
@@ -306,7 +322,32 @@ export default class LevelScene extends Phaser.Scene {
     const aba = this.cursores.down.isDown;
     this.jugador.setVelocity((der - izq) * v, (aba - arr) * v);
     if (this.jugador.body.velocity.lengthSq() > v * v) this.jugador.body.velocity.normalize().scale(v); // en diagonal no voy más rápido
+    if (this.habilidades.enTonel) this.saltoDelTonel();
     this.orientarJugador(dt);
+  }
+
+  // El tonel da un empujón extra hacia donde me muevo (o hacia donde apunta la nariz si estoy quieto)
+  saltoDelTonel() {
+    const cuerpo = this.jugador.body;
+    let dx = cuerpo.velocity.x;
+    let dy = cuerpo.velocity.y;
+    if (dx === 0 && dy === 0) {
+      dx = Math.sin(this.jugador.rotation);
+      dy = -Math.cos(this.jugador.rotation);
+    }
+    const largo = Math.hypot(dx, dy);
+    cuerpo.velocity.x += (dx / largo) * TONEL_SALTO;
+    cuerpo.velocity.y += (dy / largo) * TONEL_SALTO;
+  }
+
+  // Una bala enemiga que me toca durante el tonel sale rebotada con la velocidad invertida, y ahora es mía: puede pegarles a los aviones
+  devolverBala(bala) {
+    const vx = -bala.body.velocity.x * 1.5;
+    const vy = -bala.body.velocity.y * 1.5;
+    const devuelta = this.balasJugador.create(bala.x, bala.y, 'bala').setDepth(4).setScale(BALA_ESC).setTint(0x7fe8ff).setRotation(Math.atan2(vx, -vy));
+    devuelta.nivel = bala.nivel; // la altura del avión que la disparó: así le puede pegar a él
+    devuelta.setVelocity(vx, vy);
+    bala.destroy();
   }
 
   // El avión apunta hacia donde me muevo, en las ocho direcciones: a la derecha o a la izquierda mira de lado, hacia abajo mira

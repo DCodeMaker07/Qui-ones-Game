@@ -2,11 +2,12 @@ import Phaser from 'phaser';
 import { ambiente } from '../efectos/Ambiente.js';
 import { playSfx } from '../audio/audio.js';
 import { crearBaseEnLlamas } from '../efectos/BaseEnLlamas.js';
-import { TXT } from '../../ui/tema.js';
+import { CAPA, TXT, estiloHud } from '../../ui/tema.js';
+import { PUNTAJE_FINAL_BUENO, PUNTOS } from './constantes.js';
 
 // El final del Nivel 3. La base no se destruye con bombas: se queda al 25 % de su vida y ahí aparece el aviso para lanzarme en
 // picada con ENTER. La picada es una escena automática: el avión gira hacia la base, cae achicándose, estalla, y la base queda
-// calcinada y en llamas durante 5 s antes de pasar al final. Si perdí pocos soldados, antes se ve el final alternativo.
+// calcinada y en llamas durante 5 s antes de pasar al final. Si el puntaje es alto se ve el final alternativo (Quiñones sobrevive).
 export default class Picada {
   constructor(escena) {
     this.escena = escena;
@@ -42,6 +43,9 @@ export default class Picada {
     const e = this.escena;
     if (!this.lista || e.terminado || e.pausado || this.activa || performance.now() < this.bloqueadaHasta) return;
     this.activa = true;
+    e.puntoDeControl.borrar();
+    e.puntaje.sumar(PUNTOS.base); // la base cae con la picada
+    e.puntaje.bonoDeNivel();
     e.terminado = true; // congela spawns, daño y controles
     e.physics.pause();
     e.hud.quitarAviso('picada');
@@ -90,6 +94,7 @@ export default class Picada {
       crearBaseEnLlamas(e, x, y, escala, 1);
       e.hud.ocultar();
       e.radio.ocultar();
+      this.mostrarPuntaje();
     });
     e.objetivos
       .filter((o) => o.activo && o !== b)
@@ -103,11 +108,26 @@ export default class Picada {
     e.time.delayedCall(6150, () => this.terminar());
   }
 
-  // El final histórico siempre se ve. Si perdí pocos soldados, antes se ve el alternativo
+  // Mientras la base arde muestro el puntaje final y cuál de los dos finales viene
+  mostrarPuntaje() {
+    const e = this.escena;
+    const total = e.puntaje.total;
+    const bueno = total >= PUNTAJE_FINAL_BUENO;
+    const { width } = e.scale;
+    e.add.text(width / 2, 80, `PUNTAJE FINAL: ${total}`, estiloHud(40)).setOrigin(0.5).setDepth(CAPA.hud + 2);
+    e.add
+      .text(width / 2, 132, bueno ? 'FINAL ALTERNATIVO DESBLOQUEADO' : `FINAL HISTÓRICO (para el alternativo hacían falta ${PUNTAJE_FINAL_BUENO})`, estiloHud(22, { color: bueno ? TXT.verde : TXT.rojo }))
+      .setOrigin(0.5)
+      .setDepth(CAPA.hud + 2);
+  }
+
+  // Con el puntaje alto se ve el final alternativo, donde Quiñones sobrevive. Con menos, el histórico, donde muere y aparece en gris
+  // (CutsceneScene y el ending leen 'finalMalo' del registro)
   terminar() {
     const e = this.escena;
-    const alternativo = e.soldados.bajas <= (e.cfg.finalAltMaxBajas ?? 2);
-    if (alternativo) e.scene.start('FinalAlternativoScene');
+    const bueno = e.puntaje.total >= PUNTAJE_FINAL_BUENO;
+    e.registry.set('finalMalo', !bueno);
+    if (bueno) e.scene.start('FinalAlternativoScene');
     else e.scene.start('CutsceneScene', { id: 'tributo' });
   }
 
