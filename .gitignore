@@ -3,4 +3,8 @@ dist
 .DS_Store
 *.log
 _to_delete/
-public/assets/audio/musica/
+# TEMPORAL: la música se sube hoy para que Render la tenga. Descomenta la línea de abajo para volver a ignorarla.
+# public/assets/audio/musica/
+
+# Archivos de bloqueo de Office (aparecen mientras un .pptx está abierto)
+~$*
