@@ -37,7 +37,8 @@ const CONTROLES_TECLADO = [
   ['ALTURA', `${nombreTeclado(TECLAS.subir)} sube, ${TECLAS.bajar} baja (los enemigos te siguen)`],
   ['TONEL', `${TECLAS.tonel}  (esquiva y devuelve las balas, recarga ${TONEL_ESPERA} s)`],
   ['AGUA', `${TECLAS.agua}  (apaga el fuego de la R, recarga ${AGUA_ESPERA} s)`],
-  ['RADIO', `${TECLAS.radio}  (órdenes a Layla: "coloca barreras", "trae refuerzos", "que avancen más rápido")`],
+  ['RADIO', `${TECLAS.radio}  (habla con Layla)`],
+  ['ÓRDENES', '"coloca barreras", "trae refuerzos", "que avancen más rápido"'],
   ['BOTIQUÍN', `${TECLAS.botiquin}  o decir "botiquín"`],
   ['ZOOM', 'rueda del mouse (el mouse sirve también para los menús)'],
 ];
@@ -54,6 +55,7 @@ const controlesMando = (estilo) => {
     ['TONEL', `${b('Y')}  (esquiva y devuelve las balas, recarga ${TONEL_ESPERA} s)`],
     ['AGUA', `${b('X')}  (apaga el fuego de la R, recarga ${AGUA_ESPERA} s)`],
     ['RADIO', `${b('R3')}  (apretar el stick derecho)   BOTIQUÍN: ${b('SEL')}`],
+    ['ÓRDENES', '"coloca barreras", "trae refuerzos", "que avancen más rápido"'],
     ['ZOOM', 'stick derecho: arriba acerca, abajo aleja'],
     ['PAUSA', `${b('START')}  (en los menús, ${b('A')} acepta y ${b('B')} vuelve)`],
   ];
@@ -456,11 +458,41 @@ export default class TitleScene extends Phaser.Scene {
   pintarControles() {
     this.ctrlBotones.forEach((b, i) => b.pintar(i === this.controlSel));
     const lista = OPCIONES_CONTROL[this.controlSel].lista();
-    this.panelCuerpo.setText(lista.map(([a, b]) => a.padEnd(11) + b).join('\n')).setAlign('left').setFontSize(14).setLineSpacing(4).setY(62);
+    // Una fila por control (etiqueta a la izquierda y descripción a la derecha) que se ajusta sola al panel, en vez de un solo texto que se salía
+    this.panelCuerpo.setText('');
+    this.ctrlFilas?.destroy(true);
+    this.ctrlFilas = this.construirFilas(lista);
+    this.panel.add(this.ctrlFilas);
+  }
+
+  // Las filas de la lista de controles. La descripción baja a otra línea si no cabe en el ancho del panel, y se prueba el tamaño de letra de
+  // mayor a menor hasta que todas las filas entren en el alto que queda debajo de las opciones (la etiqueta de cada fila va en naranja)
+  construirFilas(lista) {
+    const X0 = -310; // borde izquierdo del área de texto, dentro del panel de 660 px
+    const ANCHO = 620;
+    const Y0 = -52; // justo debajo de las opciones (teclado, Xbox, PlayStation)
+    const ALTO = 212; // hasta encima de la ayuda de abajo
+    let filas = null;
+    for (let tam = 15; tam >= 10; tam--) {
+      filas?.destroy(true);
+      filas = this.add.container(0, 0);
+      const anchoEtiqueta = Math.ceil(10 * tam * 0.6) + 10;
+      let y = Y0;
+      lista.forEach(([a, b]) => {
+        const etiqueta = this.add.text(X0, y, a, { fontFamily: FUENTE, fontSize: `${tam}px`, color: TXT.naranja });
+        const descripcion = this.add.text(X0 + anchoEtiqueta, y, b, { fontFamily: FUENTE, fontSize: `${tam}px`, color: TXT.blanco, wordWrap: { width: ANCHO - anchoEtiqueta } });
+        filas.add([etiqueta, descripcion]);
+        y += Math.max(etiqueta.height, descripcion.height) + 3;
+      });
+      if (y - Y0 <= ALTO) break; // si ni a 10 px entra, queda al mínimo
+    }
+    return filas;
   }
 
   abrirPanel(titulo, cuerpo, alineacion, tam = 19, espacio = 10, tipo = 'texto') {
     this.panelTitulo.setText(titulo);
+    this.ctrlFilas?.destroy(true); // la lista por filas es solo de Controles
+    this.ctrlFilas = null;
     this.ctrlBotones.forEach((b) => b.setVisible(false)); // las opciones de teclado y mando son solo de Controles
     this.panelCuerpo.setText(cuerpo).setAlign(alineacion).setFontSize(tam).setLineSpacing(espacio).setY(5);
     this.panelTipo = tipo;
