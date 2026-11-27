@@ -1,6 +1,8 @@
 // Los valores fijos del servidor y lo que leo del entorno. Todo lo que quiero ajustar está acá y en ningún otro archivo.
 
 // Versión del protocolo: 2 = mensajes "sync" (historias en paralelo); 3 = "dialogo" (escenas compartidas); 4 = "barrera" (Layla coloca barreras).
+// Después de la 4 los mensajes nuevos no necesitaron subirla porque el servidor solo los reenvía: "dialogo" con a: 'listo', "barrera" con el ángulo
+// (a), el "evento" de tipo 'final' y la "escena" del tributo para las escenas finales de Layla.
 // El juego se niega a conectarse a un servidor más viejo que su RED.versionMinima.
 export const VERSION = 4;
 

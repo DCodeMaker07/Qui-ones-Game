@@ -72,6 +72,17 @@ try {
   await esperar(100);
   ok(lay.ultimo('dialogo')?.a === 'linea' && piloto.ultimo('dialogo')?.texto === 'hola', 'el mensaje dialogo llega en las dos direcciones');
 
+  // El aviso "listo" del diálogo sincronizado, el ángulo de la barrera y el aviso del final (para las escenas finales de Layla)
+  lay.enviar({ t: 'dialogo', a: 'listo', id: 'fin_nivel1', i: 0 });
+  lay.enviar({ t: 'barrera', x: 300, y: 400, a: 45 });
+  piloto.enviar({ t: 'evento', tipo: 'final', malo: true });
+  piloto.enviar({ t: 'escena', nombre: 'CutsceneScene', id: 'tributo' });
+  await esperar(100);
+  ok(piloto.ultimo('dialogo')?.a === 'listo', 'el aviso "listo" del diálogo llega al piloto');
+  ok(piloto.ultimo('barrera')?.a === 45, 'la barrera llega al piloto con su ángulo');
+  ok(lay.ultimo('evento')?.tipo === 'final' && lay.ultimo('evento')?.malo === true, 'el aviso del final llega a Layla');
+  ok(lay.ultimo('escena')?.id === 'tributo', 'la escena del piloto (el tributo) llega a Layla');
+
   const tercero = cliente();
   await tercero.abierto;
   tercero.enviar({ t: 'unirse', codigo: sala.codigo });

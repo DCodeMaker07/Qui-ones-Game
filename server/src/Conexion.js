@@ -10,7 +10,8 @@ import { DecodificadorTramas, OP, trama } from './websocket.js';
 //   servidor -> cliente : { t: 'sala', codigo, rol } | { t: 'companero', conectado } | { t: 'error', motivo } | { t: 'pong' }
 //   piloto    -> estratega : estado, radio, evento, escena, inicio, fin, sync, dialogo
 //   estratega -> piloto    : radio, orden, marca, botiquin, barrera, refuerzos, chat, sync, dialogo
-//   dialogo { a: 'linea' | 'fin' | 'terminar', id, i, texto }: escenas compartidas (el piloto es el líder)
+//   dialogo { a: 'linea' | 'fin' | 'listo' | 'terminar', id, i, texto }: escenas compartidas (el piloto es el líder). 'fin' lo manda quien dijo la línea
+//   justo cuando empieza a repetirla (así el otro la oye a la vez) y 'listo' el otro cuando terminó de oírla.
 //   sync { etapa }: "llegué a este punto"; cada jugador espera el sync del otro (historias en paralelo)
 export const conexiones = new Set();
 
