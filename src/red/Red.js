@@ -28,6 +28,12 @@ export class Red {
     return this.conectada && this.rol !== null;
   }
 
+  // Le toca la puerta al servidor sin esperar la respuesta: si estaba dormido empieza a despertar. No hace nada con un servidor local ni si ya hay conexión
+  despertar(url) {
+    if (!url || this.conectada || /^wss?:\/\/(localhost|127\.0\.0\.1|192\.168\.|10\.)/.test(url)) return;
+    fetch(`${url.replace(/^ws/, 'http')}/health`, { cache: 'no-store', mode: 'no-cors', signal: AbortSignal.timeout(70000) }).catch(() => {});
+  }
+
   // Conecta con el servidor. En Render (plan gratuito) el servicio duerme tras 15 min sin uso y tarda hasta ~1 min
   // en despertar, así que primero se consulta /health con reintentos.
   async conectar(url, alEstado) {

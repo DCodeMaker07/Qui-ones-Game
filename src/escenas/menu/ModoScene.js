@@ -32,6 +32,7 @@ export default class ModoScene extends Phaser.Scene {
     this.add.rectangle(0, 0, width, height, 0x000000, 0.55).setOrigin(0).setDepth(20);
 
     this.construirDom();
+    this.red.despertar(this.urlServidor); // si el servidor estaba dormido (Render gratis), empieza a despertar mientras el jugador elige el modo
     this.nav = navegarConMando(this, this.dom); // con el mando: la cruceta resalta un botón y A lo pulsa
     this.vista('modo');
 
@@ -65,7 +66,13 @@ export default class ModoScene extends Phaser.Scene {
   // ---------- HTML ----------
 
   construirDom() {
-    const url = new URLSearchParams(location.search).get('ws') || localStorage.getItem('quinones-ws') || RED.urlPorDefecto;
+    // La dirección del servidor no la escribe el jugador. En producción va dentro del juego (VITE_WS_URL al compilar). El campo "Servidor" solo se ve
+    // al desarrollar o si la página se abre con ?ws=... (para probar con otro servidor, por ejemplo un túnel de VS Code). Sin ese campo visible, tampoco
+    // se usa ni se guarda ninguna dirección vieja del navegador
+    const parametro = new URLSearchParams(location.search).get('ws');
+    this.verServidor = import.meta.env.DEV || !!parametro;
+    const url = parametro || (this.verServidor ? localStorage.getItem('quinones-ws') : null) || RED.urlPorDefecto;
+    this.urlServidor = url;
     this.dom = document.createElement('div');
     this.dom.className = 'absolute inset-0 z-10 flex items-center justify-center p-4';
     this.dom.innerHTML = `
@@ -83,7 +90,7 @@ export default class ModoScene extends Phaser.Scene {
           <div class="flex items-center gap-3 text-xs text-neutral-500"><span class="h-px flex-1 bg-neutral-700"></span>o<span class="h-px flex-1 bg-neutral-700"></span></div>
           <input data-campo="codigo" maxlength="4" autocomplete="off" placeholder="Código de la sala" class="${INPUT} text-center text-xl uppercase tracking-[0.4em]" />
           <button data-accion="unirse" class="${BTN2}">Unirme (soy Layla, la estratega)</button>
-          <details class="text-xs text-neutral-400">
+          <details class="${this.verServidor ? '' : 'hidden '}text-xs text-neutral-400">
             <summary class="cursor-pointer">Servidor</summary>
             <input data-campo="url" value="${url}" placeholder="wss://mi-servicio.onrender.com" class="${INPUT} mt-2 text-xs" />
           </details>
@@ -180,6 +187,7 @@ export default class ModoScene extends Phaser.Scene {
 
   accion_multi() {
     this.vista('multi');
+    if (!this.urlServidor) this.mostrarError('Este sitio todavía no tiene un servidor de salas configurado.');
   }
 
   accion_atras() {
@@ -188,7 +196,7 @@ export default class ModoScene extends Phaser.Scene {
 
   async conectar() {
     const url = this.el('[data-campo="url"]').value.trim();
-    localStorage.setItem('quinones-ws', url);
+    if (this.verServidor) localStorage.setItem('quinones-ws', url);
     this.bloquear(true);
     try {
       await this.red.conectar(url, (t) => this.info(t));
