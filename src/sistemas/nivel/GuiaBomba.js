@@ -31,7 +31,7 @@ export default class GuiaBomba {
     const yImpacto = j.y + 240 - e.velTerreno * 0.7;
     if (yImpacto <= y0 + 10) return;
 
-    const acierta = e.objetivos.some((o) => o.activo && Phaser.Math.Distance.Between(x, yImpacto, o.x, o.y) < RADIO_BOMBA + o.radio);
+    const acierta = e.objetivos.some((o) => o.activo && o.alcanza(x, yImpacto, RADIO_BOMBA));
     const amigos = !acierta && e.aliados.getChildren().some((a) => Phaser.Math.Distance.Between(x, yImpacto, a.x, a.y) < 45);
     const color = acierta ? 0x5cff7a : amigos ? 0xff5c5c : 0xffffff;
 

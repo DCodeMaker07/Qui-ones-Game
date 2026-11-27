@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { ESCALA, GAME } from '../../config.js';
 import Objetivo from '../../entidades/Objetivo.js';
-import { FILA_CADA, FILA_PRIMERA, LINEA_PARADA, MAX_SOLDADOS_ENEMIGOS } from './constantes.js';
+import { SEGUNDOS_SIN_TORRETAS, FILA_CADA, FILA_PRIMERA, LINEA_PARADA, MAX_SOLDADOS_ENEMIGOS } from './constantes.js';
 
 // Cómo avanza el mapa. Va bajando mientras no haya torretas; cuando aparece un grupo y llega cerca del centro, el mapa
 // frena (con una frenada suave) y no se mueve hasta que las destruyo todas. Entre grupo y grupo cuento el terreno que recorro
@@ -47,10 +47,14 @@ export default class Avance {
     this.tuvoTorretas = torretas.length > 0;
     if (e.fase !== 'avance' || e.baseEnemiga.frenando) return this.ocultarAviso();
 
-    // El mapa se frena cuando las torretas llegan al centro y también mientras haya fuego de la R en pantalla: mis soldados
-    // no pasan por las llamas, así que no se avanza hasta que lo apague con agua
+    // El mapa se frena cuando las torretas llegan al centro, mientras haya una fila de soldados enemigos y mientras el fuego de la R
+    // bloquee a mis soldados (no pasan por las llamas, así que no se avanza hasta que lo apague con agua)
     const fuego = e.especial.fuegoBloqueante();
-    const detener = fuego || (torretas.length > 0 && torretas.every((o) => o.y >= LINEA_PARADA));
+    const enFila = e.soldadosEnemigos.soldadosDeFila(); // una fila de soldados enemigos que les cierra el camino a los míos
+    const guardias = e.soldadosEnemigos.guardiasEnPantalla(); // soldados enemigos sueltos que ya entraron a la pantalla
+    // Con torretas, el mapa se frena cuando llegan todas al centro; sin torretas, mientras quede algún soldado enemigo en pantalla. En los dos
+    // casos no avanza hasta destruirlo todo
+    const detener = fuego || enFila > 0 || (torretas.length > 0 ? torretas.every((o) => o.y >= LINEA_PARADA) : guardias > 0);
     const meta = detener ? 0 : GAME.scrollSpeed;
     const paso = (GAME.scrollSpeed / 0.7) * dt; // arranca y frena en 0,7 s
     e.velTerreno = meta > e.velTerreno ? Math.min(meta, e.velTerreno + paso) : Math.max(meta, e.velTerreno - paso);
@@ -60,7 +64,12 @@ export default class Avance {
     this.estabaParado = parado;
 
     if (detener && parado && !fuego) {
-      const texto = `DESTRUYE TODAS LAS TORRETAS PARA AVANZAR (${torretas.length})`;
+      const texto =
+        enFila > 0
+          ? `ROMPE LA FILA ENEMIGA PARA AVANZAR (${enFila})`
+          : torretas.length > 0
+            ? `DESTRUYE TODAS LAS TORRETAS PARA AVANZAR (${torretas.length})`
+            : `ELIMINA A LOS SOLDADOS ENEMIGOS PARA AVANZAR (${guardias})`;
       if (texto !== this.textoAviso) e.hud.mostrarAviso('avance', texto);
       this.textoAviso = texto;
     } else {
@@ -82,6 +91,8 @@ export default class Avance {
       this.recorrido = 0;
       return;
     }
+    // Poco antes de que llegue la base ya no salen grupos nuevos de torretas, para que no se sobrepongan con ella
+    if (e.cfg.jefeEn && this.tNivel >= e.cfg.jefeEn - SEGUNDOS_SIN_TORRETAS) return;
     this.recorrido += e.velTerreno * dt;
     if (this.recorrido >= (e.cfg.entreOleadas ?? 420)) {
       this.recorrido = 0;

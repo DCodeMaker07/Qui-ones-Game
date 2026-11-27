@@ -160,6 +160,28 @@ export default class Objetivo {
     if (this.vida <= this.vidaMax / 2) this.incendiar();
   }
 
+  // Qué tan lejos está (x, y) del borde del objetivo: de la muralla si es la base (0 si está adentro) y del círculo de la torreta si no.
+  // Con esto mis soldados saben cuándo están a distancia de atacar sin meterse adentro
+  distanciaAlBorde(x, y) {
+    if (!this.jefe) return Math.max(0, Phaser.Math.Distance.Between(x, y, this.x, this.y) - this.radio);
+    const caja = this.base.getBounds();
+    return Math.hypot(Math.max(caja.left - x, 0, x - caja.right), Math.max(caja.top - y, 0, y - caja.bottom));
+  }
+
+  // El punto del borde de la base más cercano a (x, y), para marchar hacia él en vez de hacia el centro
+  puntoMasCercano(x, y) {
+    const caja = this.base.getBounds();
+    return { x: Phaser.Math.Clamp(x, caja.left, caja.right), y: Phaser.Math.Clamp(y, caja.top, caja.bottom) };
+  }
+
+  // ¿Una bomba que cae en (x, y) con ese radio de explosión alcanza a este objetivo? Una torreta es un círculo. Una base es enorme, así que
+  // cuenta todo el dibujo (un rectángulo): antes solo contaba cerca de su centro y las bombas que caían en los costados no le hacían nada
+  alcanza(x, y, margen, factorRadio = 1) {
+    if (!this.jefe) return Phaser.Math.Distance.Between(x, y, this.x, this.y) < margen + this.radio * factorRadio;
+    const caja = this.base.getBounds();
+    return x > caja.left - margen && x < caja.right + margen && y > caja.top - margen && y < caja.bottom + margen;
+  }
+
   // Devuelve true si el objetivo fue destruido.
   recibirDano(n) {
     this.vida -= n;

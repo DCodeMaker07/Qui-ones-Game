@@ -3,7 +3,8 @@ import { ambiente } from '../efectos/Ambiente.js';
 import { playSfx } from '../audio/audio.js';
 import { bombaCayendo } from '../efectos/bomba.js';
 import {
-  FUEGO_APILA_MAX, FUEGO_APILA_RADIO, FUEGO_DPS, FUEGO_MIN_BLOQUEO, FUEGO_RADIO, TECLAS, ULTI_CADA, ULTI_DANO_BOMBA, ULTI_DURACION, ULTI_ESPERA, ULTI_FACTOR_JEFE, ULTI_RADIO_BOMBA,
+  FUEGO_APILA_MAX, FUEGO_APILA_RADIO, FUEGO_DPS, FUEGO_DISTANCIA_ALIADOS, FUEGO_MIN_BLOQUEO, FUEGO_RADIO, TECLAS, ULTI_CADA, ULTI_DANO_BOMBA, ULTI_DURACION, MARGEN_BORRADO, ULTI_DANO_SOLDADO, ULTI_ESPERA, ULTI_FACTOR_JEFE, ULTI_RADIO_BOMBA, ULTI_RADIO_SOLDADO,
+  nombreTecla,
 } from './constantes.js';
 
 // Mi habilidad especial (tecla R): un bombardeo de fuego. Durante 1,5 s voy soltando bombas donde caerían las normales y
@@ -31,10 +32,20 @@ export default class BombardeoEspecial {
     return this.fuegos.length > 0;
   }
 
-  // Solo el fuego grande (una pasada entera de la R) frena el mapa y a mis soldados. Un parche chico no: se queda donde cayó, baja con el
-  // terreno y mis soldados lo rodean
+  // Solo el fuego grande (una pasada entera de la R) frena el mapa y a mis soldados, y solo si hay soldados aliados vivos cerca de las
+  // llamas. Un parche chico no frena nada, y un fuego lejos de mis soldados (o cuando no queda ninguno) tampoco: el mapa sigue. Lo calculo
+  // una vez por fotograma, porque lo consultan el avance, el objetivo y el aviso
   fuegoBloqueante() {
-    return this.fuegos.length >= FUEGO_MIN_BLOQUEO;
+    const e = this.escena;
+    const cuadro = e.game.getFrame();
+    if (this.cuadroBloqueo === cuadro) return this.bloquea;
+    this.cuadroBloqueo = cuadro;
+    // Cuando ya llegó la base no bloquea nada: mis soldados pueden rodear las llamas y acercarse a atacarla por otro lado
+    this.bloquea =
+      e.fase === 'avance' &&
+      this.fuegos.length >= FUEGO_MIN_BLOQUEO &&
+      e.aliados.getChildren().some((a) => a.active && this.fuegos.some((f) => Phaser.Math.Distance.Between(a.x, a.y, f.x, f.y) < FUEGO_RADIO + FUEGO_DISTANCIA_ALIADOS));
+    return this.bloquea;
   }
 
   // El foco de fuego más cercano a (x, y) que esté a menos de "radio", o null
@@ -55,7 +66,7 @@ export default class BombardeoEspecial {
     const e = this.escena;
     if (e.terminado || e.pausado || this.activa) return;
     if (this.recarga > 0) return e.radio.mostrar(`Bombardeo especial listo en ${Math.ceil(this.recarga)} s.`, { duracion: 1500 });
-    this.recarga = ULTI_ESPERA;
+    this.recarga = ULTI_ESPERA * e.habilidades.factorEnfriamiento();
     this.activa = true;
     this.t = 0;
     this.acumulado = 0;
@@ -102,29 +113,33 @@ export default class BombardeoEspecial {
     this.danar(x, y);
   }
 
-  // El daño propio de cada bomba: se suma bomba a bomba mientras el avión pasa por encima
+  // El daño propio de cada bomba: se suma bomba a bomba mientras el avión pasa por encima. Los soldados enemigos que caen cerca
+  // también lo reciben, así la R los barre aunque no queden justo sobre la llama
   danar(x, y) {
+    this.escena.soldadosEnemigos.explotarSuave(x, y, ULTI_RADIO_SOLDADO, ULTI_DANO_SOLDADO);
     this.escena.objetivos.forEach((o) => {
       if (!o.activo || o.y < 0) return;
-      if (Phaser.Math.Distance.Between(x, y, o.x, o.y) < ULTI_RADIO_BOMBA + o.radio * 0.6) o.recibirDano(o.jefe ? ULTI_DANO_BOMBA * ULTI_FACTOR_JEFE : ULTI_DANO_BOMBA);
+      if (o.alcanza(x, y, ULTI_RADIO_BOMBA, 0.6)) o.recibirDano(o.jefe ? ULTI_DANO_BOMBA * ULTI_FACTOR_JEFE : ULTI_DANO_BOMBA); // cada bomba que cae suma su daño
     });
   }
 
-  // El agua (F) cae en (x, y) y apaga todos los focos que estén dentro del radio. Salpica y sale vapor de cada foco apagado
-  apagar(x, y, radio) {
+  // El agua (F) cae en (x, y) y apaga todos los focos que estén dentro del radio. Salpica y sale vapor de cada foco apagado. Como el
+  // agua sale como una línea de muchas gotas (linea = true), cada una salpica poco para no llenar la pantalla
+  apagar(x, y, radio, { linea = false } = {}) {
     const e = this.escena;
     const apagados = this.fuegos.filter((f) => Phaser.Math.Distance.Between(x, y, f.x, f.y) < radio);
     this.fuegos = this.fuegos.filter((f) => !apagados.includes(f));
     apagados.forEach((f) => f.sprite?.destroy());
 
-    const anillo = e.add.circle(x, y, radio, 0x4aa8ff, 0.25).setStrokeStyle(3, 0x9fd4ff, 0.9).setDepth(6).setScale(0.2);
-    e.tweens.add({ targets: anillo, scale: 1, alpha: 0, duration: 650, ease: 'Cubic.easeOut', onComplete: () => anillo.destroy() });
-    for (let i = 0; i < 12; i++) {
+    const anillo = e.add.circle(x, y, radio, 0x4aa8ff, linea ? 0.12 : 0.25).setStrokeStyle(linea ? 2 : 3, 0x9fd4ff, linea ? 0.5 : 0.9).setDepth(6).setScale(0.2);
+    e.tweens.add({ targets: anillo, scale: linea ? 0.8 : 1, alpha: 0, duration: linea ? 420 : 650, ease: 'Cubic.easeOut', onComplete: () => anillo.destroy() });
+    const salpicaduras = linea ? 4 : 12;
+    for (let i = 0; i < salpicaduras; i++) {
       const gota = e.add.circle(x, y, Phaser.Math.Between(3, 6), 0x7cc4ff, 0.9).setDepth(6);
-      const ang = (i / 12) * Math.PI * 2;
+      const ang = (i / salpicaduras) * Math.PI * 2;
       e.tweens.add({ targets: gota, x: x + Math.cos(ang) * radio * 0.9, y: y + Math.sin(ang) * radio * 0.9, alpha: 0, duration: 550, ease: 'Quad.easeOut', onComplete: () => gota.destroy() });
     }
-    apagados.slice(0, 14).forEach((f) => {
+    apagados.slice(0, linea ? 3 : 14).forEach((f) => {
       const vapor = e.add.circle(f.x, f.y, 10, 0xeef6ff, 0.6).setDepth(6);
       e.tweens.add({ targets: vapor, y: f.y - 60, scale: 2.6, alpha: 0, duration: 900, onComplete: () => vapor.destroy() });
     });
@@ -136,7 +151,7 @@ export default class BombardeoEspecial {
     const hay = this.fuegoBloqueante();
     if (hay === this.avisado) return;
     this.avisado = hay;
-    if (hay) this.escena.hud.mostrarAviso('fuego', `EL FUEGO BLOQUEA A TUS ALIADOS\nAPÁGALO CON AGUA (${TECLAS.agua})`, '#ff9a4a');
+    if (hay) this.escena.hud.mostrarAviso('fuego', `EL FUEGO BLOQUEA A TUS ALIADOS\nAPÁGALO CON AGUA (${nombreTecla(TECLAS.agua)})`, '#ff9a4a');
     else this.escena.hud.quitarAviso('fuego');
   }
 
@@ -146,7 +161,7 @@ export default class BombardeoEspecial {
     const g = this.grafico.clear();
     const { height } = e.scale;
     this.fuegos = this.fuegos.filter((f) => {
-      if (f.y <= height + 80) return true;
+      if (f.y <= height + MARGEN_BORRADO) return true;
       f.sprite?.destroy();
       return false; // se salió de la pantalla por abajo
     });

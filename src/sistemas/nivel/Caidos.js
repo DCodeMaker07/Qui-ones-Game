@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { ESCALA } from '../../config.js';
-import { CAIDO_PERMANENCIA_MS } from './constantes.js';
+import { CAIDO_PERMANENCIA_MS, MARGEN_BORRADO } from './constantes.js';
 
 // Los soldados caídos en el suelo, aliados ('muerte_aliado') y enemigos ('muerte_enemigo'). Llegan con un golpe (un poco más grandes y
 // transparentes, y se asientan) y levanta polvo. Baja con el terreno, se queda unos segundos y se desvanece. El dibujo es opcional:
@@ -31,7 +31,7 @@ export default class Caidos {
     this.lista = this.lista.filter((c) => c.active);
     this.lista.forEach((c) => {
       c.y += e.velTerreno * dt;
-      if (c.y > e.scale.height + 100) c.destroy();
+      if (c.y > e.scale.height + MARGEN_BORRADO) c.destroy();
     });
   }
 }

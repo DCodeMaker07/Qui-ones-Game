@@ -1,7 +1,7 @@
 import Phaser from 'phaser';
 import { ESCALA } from '../../config.js';
 import { ambiente } from '../efectos/Ambiente.js';
-import { BOTIQUINES_POR_NIVEL, CURA_ALIADO, CURA_JUGADOR, ESPERA_BOTIQUIN_MS, RADIO_RECOGER, TECLAS, VIDA_ALIADO, VIDA_JUGADOR } from './constantes.js';
+import { MARGEN_BORRADO, BOTIQUINES_POR_NIVEL, CURA_ALIADO, CURA_JUGADOR, ESPERA_BOTIQUIN_MS, RADIO_RECOGER, TECLAS, VIDA_ALIADO, VIDA_JUGADOR, nombreTecla } from './constantes.js';
 
 // Botiquines con paracaídas. Caen, se quedan en el suelo avanzando con el terreno y los recogen mis soldados heridos
 // o yo mismo si paso volando por encima y me falta vida. Tengo pocos por nivel y hay que esperar entre uno y otro.
@@ -22,7 +22,7 @@ export default class Botiquines {
   pedir(pos) {
     const e = this.escena;
     if (e.terminado || e.pausado) return;
-    if (!pos && e.multijugador.hayLayla()) return e.radio.mostrar(`Pídele el botiquín a Layla por radio (${TECLAS.radio}).`);
+    if (!pos && e.multijugador.hayLayla()) return e.radio.mostrar(`Pídele el botiquín a Layla por radio (${nombreTecla(TECLAS.radio)}).`);
     if (this.restantes <= 0) return e.radio.mostrar('Sin botiquines disponibles.');
     const espera = this.esperaRestante();
     if (espera > 0) return e.radio.mostrar(`Preparando otro botiquín: ${Math.ceil(espera / 1000)} s.`);
@@ -91,7 +91,7 @@ export default class Botiquines {
         }
       } else {
         b.y += e.velTerreno * dt; // en el suelo se mueve con el terreno
-        if (b.y > e.scale.height + 60) b.destroy();
+        if (b.y > e.scale.height + MARGEN_BORRADO) b.destroy();
       }
     });
     if (e.vida < VIDA_JUGADOR) {

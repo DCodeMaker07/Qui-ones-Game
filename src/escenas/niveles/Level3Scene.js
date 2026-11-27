@@ -17,11 +17,10 @@ export default class Level3Scene extends LevelScene {
       baseFija: true,
       vidaBase: 36,
       spriteBase: 'base_enemiga', // el sprite de la base (public/assets/sprites/objetivos/base_enemiga.png, 264x132)
-      escalaSpriteBase: 2, // lo dibujo al doble: 264x132 pasa a 528x264 px en pantalla (es el final, tiene que ser enorme)
-      radioSpriteBase: 175, // radio donde pegan mis bombas sobre la base (el sprite es muy ancho)
+      escalaSpriteBase: 3, // lo dibujo al triple: 264x132 pasa a 792x396 px en pantalla (es el final, tiene que ser enorme)
+      radioSpriteBase: 260, // radio del objetivo sobre la base (el sprite es muy ancho)
       escalaBase: 1.35, // si no hubiera sprite de la base, uso el depósito del Nivel 2 agrandado (y su radio de impacto)
       baseVidaMinima: 0.25, // la base no baja de esta fracción de vida: de ahí en adelante hay que lanzarse en picada
-      defensas: [[-340, -40], [340, -40], [-340, 130], [340, 130], [-150, 200], [150, 200]], // torretas fijas (dx, dy desde el centro de la base): rodean el sprite de 528x264 sin quedar encima
       escenaFinal: null, // el final lo decide la picada
       musica: 'musica_nivel3',
       musicaInicio: 22, // la canción arranca en el segundo 22

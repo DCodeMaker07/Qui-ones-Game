@@ -15,8 +15,8 @@ export default class Level2Scene extends LevelScene {
       vidaBase: 12,
       escalaBase: 1.4, // si faltara el dibujo de la base, el depósito de respaldo se dibuja un 40 % más grande (y su radio de impacto crece igual)
       spriteBase: 'base_suministros', // el dibujo propio de la base (264x132)
-      escalaSpriteBase: 1.1, // 264x132 pasa a unos 290x145 px en pantalla
-      radioSpriteBase: 96, // radio donde pegan las bombas sobre la base
+      escalaSpriteBase: 2, // 264x132 pasa a 528x264 px en pantalla (antes 1,1: se veía muy chica)
+      radioSpriteBase: 175, // radio del objetivo sobre la base (las bombas cuentan todo el dibujo, ver Objetivo.alcanza)
       escenaFinal: 'fin_nivel2', // la escena del final (datos/historia.js) y de ahí paso al Nivel 3
       musica: 'musica_nivel2',
     });

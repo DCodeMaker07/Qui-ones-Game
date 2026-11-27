@@ -2,10 +2,10 @@ import Phaser from 'phaser';
 import { ESCALA, GAME } from '../../config.js';
 import Objetivo from '../../entidades/Objetivo.js';
 import { ambiente } from '../efectos/Ambiente.js';
-import { ESPERA_PRIMERA_OLEADA, PX_POR_KM, TECLAS } from './constantes.js';
+import { MAX_SOLDADOS_ENEMIGOS, OLEADA_BASE, ESPERA_PRIMERA_OLEADA, PX_POR_KM, TECLAS, nombreTecla } from './constantes.js';
 
 // La base enemiga de los niveles 2 y 3. Aparece cuando recorrí cierta distancia, el terreno se frena cuando queda en el centro,
-// se arman las defensas, los aviones salen de ella y yo pido refuerzos por radio (o llegan solos si no puedo hablar).
+// la base suelta oleadas de soldados, los aviones entran por arriba y los costados y yo pido refuerzos por radio (o llegan solos si no puedo hablar).
 export default class BaseEnemiga {
   constructor(escena) {
     this.escena = escena;
@@ -58,7 +58,8 @@ export default class BaseEnemiga {
   actualizar(dt) {
     const e = this.escena;
     // La base aparece cuando recorrí la distancia del nivel
-    if (e.cfg.jefeEn && !e.depositoCreado && e.avance.tNivel >= e.cfg.jefeEn) this.crearDeposito();
+    // Y espera a que no quede ninguna torreta viva: si saliera con torretas en pantalla, la base les pasaría por encima y quedarían superpuestas
+    if (e.cfg.jefeEn && !e.depositoCreado && e.avance.tNivel >= e.cfg.jefeEn && !e.objetivos.some((o) => o.activo && o.arma)) this.crearDeposito();
     this.frenarTerreno(dt);
   }
 
@@ -83,21 +84,47 @@ export default class BaseEnemiga {
     e.fase = 'base';
     e.soldadosEnemigos.guarnicion(b.x, b.y, 5, Math.max(120, b.radio * 1.1)); // la guarnición de la base
 
-    // Las defensas fijas rodean la base
-    (e.cfg.defensas ?? [[-300, -50], [300, -50], [-330, 110], [330, 110]]).forEach(([dx, dy]) => this.crearNidoFijo(b.x + dx, b.y + dy));
+    // La base ya no tiene torretas alrededor: en cambio suelta oleadas de soldados enemigos (ver salirOleada)
+    this.programarOleada(OLEADA_BASE.primera * 1000);
     e.aviones.espera = ESPERA_PRIMERA_OLEADA; // los aviones de la base también salen en oleadas (ver Enemigos)
     e.puntoDeControl.guardar(); // llegué a la base: este es el punto de control
 
-    e.radio.mostrar(`Encontraste la base. Pulsa ${TECLAS.radio} y pide refuerzos: "Encontré la ubicación, necesito refuerzos".`, { duracion: 9000 });
-    e.hud.mostrarAviso('refuerzos', `PULSA ${TECLAS.radio} Y DI:\n"ENCONTRÉ LA UBICACIÓN, NECESITO REFUERZOS"`);
+    e.radio.mostrar(`Encontraste la base. Pulsa ${nombreTecla(TECLAS.radio)} y pide refuerzos: "Encontré la ubicación, necesito refuerzos".`, { duracion: 9000 });
+    e.hud.mostrarAviso('refuerzos', `PULSA ${nombreTecla(TECLAS.radio)} Y DI:\n"ENCONTRÉ LA UBICACIÓN, NECESITO REFUERZOS"`);
     // Sin micrófono no puedo pedirlos por voz: llegan solos
     if (!e.game.voice?.soportado) e.time.delayedCall(8000, () => this.llamarRefuerzos(true));
   }
 
-  crearNidoFijo(x, y) {
+  // Programa la próxima oleada de soldados que sale de la base, y cuando sale vuelve a programar la siguiente (mientras la base siga en pie)
+  programarOleada(ms) {
     const e = this.escena;
-    e.objetivos.push(new Objetivo(e, x, y, { vida: 3, radio: 34, escala: ESCALA.nido }));
-    e.soldadosEnemigos.guarnicion(x, y, 1, 50);
+    e.time.delayedCall(ms, () => {
+      if (e.terminado || !e.baseObj?.activo) return;
+      this.salirOleada();
+      this.programarOleada(Phaser.Math.Between(...OLEADA_BASE.cada) * 1000);
+    });
+  }
+
+  // Una oleada: de 4 a 6 soldados enemigos aparecen dentro de la base, en su mitad de abajo, de a uno y con un fundido, y salen a buscar a
+  // mis soldados (la base no los bloquea: solo las barreras). Si ya hay demasiados soldados enemigos en pantalla, se salta la oleada
+  salirOleada() {
+    const e = this.escena;
+    const b = e.baseObj;
+    if (e.soldadosEnemigos.lista.length >= MAX_SOLDADOS_ENEMIGOS) return;
+    const caja = b.base.getBounds();
+    const cuantos = Phaser.Math.Between(...OLEADA_BASE.soldados);
+    for (let i = 0; i < cuantos; i++) {
+      e.time.delayedCall(i * 450, () => {
+        if (e.terminado || !b.activo) return;
+        const s = e.soldadosEnemigos.crear(caja.centerX + Phaser.Math.Between(-caja.width * 0.3, caja.width * 0.3), caja.centerY + Phaser.Math.Between(0, caja.height * 0.3));
+        s.setAlpha(0);
+        e.tweens.add({ targets: s, alpha: 1, duration: 300 });
+      });
+    }
+    if (!this.oleadaAvisada) {
+      this.oleadaAvisada = true;
+      e.radio.mostrar('Layla: ¡Salen soldados de la base! Prepárense.', { duracion: 4000 });
+    }
   }
 
   refuerzoNoEntendido() {
@@ -116,12 +143,11 @@ export default class BaseEnemiga {
     e.radio.mostrar(mensaje, { duracion: 4000 });
     e.game.voice?.hablar(mensaje, undefined, 'M'); // Layla siempre responde con voz de mujer
 
-    // Tres escuadras entran por abajo, una tras otra
-    const { width, height } = e.scale;
-    [[1500, 0.3], [5000, 0.7], [8500, 0.5]].forEach(([ms, f]) => {
+    // Tres escuadras entran por los costados, una tras otra (izquierda, derecha, izquierda)
+    [[1500, -1], [5000, 1], [8500, -1]].forEach(([ms, lado]) => {
       e.time.delayedCall(ms, () => {
         if (e.terminado) return;
-        [[-36, 0], [0, 45], [36, 0]].forEach(([dx, dy]) => e.soldados.crear(width * f + dx, height + 30 + dy));
+        e.soldados.entrarEscuadra(lado);
       });
     });
   }

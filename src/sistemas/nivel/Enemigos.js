@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { ESCALA } from '../../config.js';
 import { ambiente } from '../efectos/Ambiente.js';
 import { playSfx } from '../audio/audio.js';
-import { AVIONES_OLEADA, BALA_ESC, ENEMIGO_REACCION, ESPERA_OLEADA, ESPERA_PRIMERA_OLEADA, FACTOR_ALTURA, MAX_AVIONES, PUNTOS } from './constantes.js';
+import { AVIONES_OLEADA, BALA_ESC, MARGEN_BORRADO, ENEMIGO_REACCION, ESPERA_OLEADA, ESPERA_PRIMERA_OLEADA, FACTOR_ALTURA, MAX_AVIONES, PUNTOS } from './constantes.js';
 
 // Los aviones enemigos. Entran por arriba (o despegan de la base), se meten en la pantalla y se quedan patrullando mientras
 // queden torretas o la base: vuelan de un punto a otro de la mitad de arriba, girando suave, y le disparan a mi avión.
@@ -46,23 +46,34 @@ export default class Enemigos {
     }
   }
 
+  // Los aviones enemigos entran siempre por arriba (lo más común) o por los costados, nunca desde las bases. Los de arriba entran mirando
+  // hacia abajo y los de los costados ya salen patrullando hacia adentro
+  bordeDeEntrada() {
+    const { width } = this.escena.scale;
+    const lado = Phaser.Math.Between(0, 4); // 0 a 2: arriba; 3: izquierda; 4: derecha
+    if (lado <= 2) return { x: this.escena.xAleatorio(60), y: -260, estado: 'entrando', rumbo: Math.PI / 2 };
+    const izquierda = lado === 3;
+    return { x: izquierda ? -220 : width + 220, y: Phaser.Math.Between(60, 380), estado: 'patrulla', rumbo: izquierda ? 0 : Math.PI };
+  }
+
+  crearEnBorde() {
+    const e = this.escena;
+    const { x, y, estado, rumbo } = this.bordeDeEntrada();
+    const avion = e.enemigos.create(x, y, 'avion_enemigo').setDepth(4).setScale(escalaSegunAltura(e.altura.nivel));
+    this.preparar(avion, estado, rumbo); // aparece a mi misma altura
+  }
+
   crear() {
     const e = this.escena;
     if (e.terminado || e.fase !== 'avance' || e.enemigos.countActive(true) >= MAX_AVIONES) return;
-    const avion = e.enemigos.create(e.xAleatorio(60), -90, 'avion_enemigo').setDepth(4).setScale(escalaSegunAltura(e.altura.nivel));
-    this.preparar(avion, 'entrando', Math.PI / 2); // entra mirando hacia abajo, a mi misma altura
+    this.crearEnBorde();
   }
 
-  // Un avión despega de la base (crece desde chiquito) y sale hacia mí
+  // Durante el asedio a la base también entran por arriba y los costados (el nombre es de cuando salían de la base)
   salirDeBase() {
     const e = this.escena;
-    const b = e.baseObj;
-    if (e.terminado || !b?.activo || e.enemigos.countActive(true) >= 5) return;
-    const avion = e.enemigos.create(b.x, b.y, 'avion_enemigo').setDepth(4).setScale(0.2);
-    e.tweens.add({ targets: avion, scale: escalaSegunAltura(e.altura.nivel), duration: 900 });
-    const rumbo = Phaser.Math.Angle.Between(b.x, b.y, e.jugador.x, e.jugador.y) + Phaser.Math.FloatBetween(-0.6, 0.6);
-    this.preparar(avion, 'patrulla', rumbo);
-    ambiente.pulso('#ff8a3a', 300, 0);
+    if (e.terminado || !e.baseObj?.activo || e.enemigos.countActive(true) >= 5) return;
+    this.crearEnBorde();
   }
 
   // rumbo: hacia dónde vuela, en radianes. El sprite mira hacia arriba con rotación 0, por eso se le suma 90°
@@ -140,7 +151,7 @@ export default class Enemigos {
     e.balasEnemigas.getChildren().forEach((b) => b.setAlpha(b.nivel === miNivel ? 1 : 0.3));
     [...e.enemigos.getChildren()].forEach((a) => {
       if (!defendido && a.estado !== 'huyendo') a.estado = 'huyendo'; // sin defensas se retiran
-      if (a.y > height + 100 || a.y < -140 || a.x < -140 || a.x > width + 140) return a.destroy();
+      if (a.y > height + MARGEN_BORRADO + 60 || a.y < -MARGEN_BORRADO - 80 || a.x < -MARGEN_BORRADO - 100 || a.x > width + MARGEN_BORRADO + 100) return a.destroy();
 
       if (a.estado === 'entrando') {
         this.volar(a, Math.PI / 2, dt);

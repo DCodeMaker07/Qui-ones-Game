@@ -3,7 +3,7 @@ import { ambiente } from '../efectos/Ambiente.js';
 import { playSfx } from '../audio/audio.js';
 import { crearBaseEnLlamas } from '../efectos/BaseEnLlamas.js';
 import { CAPA, TXT, estiloHud } from '../../ui/tema.js';
-import { PUNTAJE_FINAL_BUENO, PUNTOS } from './constantes.js';
+import { PUNTAJE_FINAL_BUENO, PUNTOS, nombreTecla } from './constantes.js';
 
 // El final del Nivel 3. La base no se destruye con bombas: se queda al 25 % de su vida y ahí aparece el aviso para lanzarme en
 // picada con ENTER. La picada es una escena automática: el avión gira hacia la base, cae achicándose, estalla, y la base queda
@@ -35,7 +35,7 @@ export default class Picada {
     const mensaje = '¡La base está cediendo! Es tu momento, Quiñones.';
     e.radio.mostrar(mensaje, { duracion: 5500 });
     if (!e.multijugador.hayLayla()) e.game.voice?.hablar(mensaje, undefined, 'M');
-    e.hud.mostrarAviso('picada', 'BASE DEBILITADA\nPULSA ENTER PARA LANZARTE EN PICADA', TXT.rojo);
+    e.hud.mostrarAviso('picada', `BASE DEBILITADA\nPULSA ${nombreTecla('ENTER')} PARA LANZARTE EN PICADA`, TXT.rojo);
     e.multijugador.avisar('picadaLista');
   }
 
@@ -82,6 +82,7 @@ export default class Picada {
     );
     e.cameras.main.flash(1100, 255, 235, 170);
     e.cameras.main.shake(900, 0.02);
+    this.ondaDeChoque(x, y);
     e.enemigos.clear(true, true);
     e.balasEnemigas.clear(true, true);
     e.balasTierra.clear(true, true);
@@ -104,8 +105,18 @@ export default class Picada {
           o.retirar();
         })
       );
-    e.time.delayedCall(5400, () => e.cameras.main.fadeOut(700, 0, 0, 0));
+    e.time.delayedCall(5400, () => e.camara.fundirSalida(700));
     e.time.delayedCall(6150, () => this.terminar());
+  }
+
+  // La explosión de la base arrasa lo que la rodea: un anillo de fuego que se agranda hasta cubrir la pantalla, y los soldados enemigos que
+  // quedaban alrededor mueren cuando la onda los alcanza
+  ondaDeChoque(x, y) {
+    const e = this.escena;
+    const radio = 900; // más que la pantalla: no queda ningún soldado enemigo sin alcanzar
+    const anillo = e.add.circle(x, y, 40, 0xffd35a, 0.22).setStrokeStyle(8, 0xfff1b0, 0.95).setDepth(7);
+    e.tweens.add({ targets: anillo, scale: radio / 40, alpha: 0, duration: 1200, ease: 'Cubic.easeOut', onComplete: () => anillo.destroy() });
+    e.soldadosEnemigos.onda(x, y, radio, 1100);
   }
 
   // Mientras la base arde muestro el puntaje final y cuál de los dos finales viene
@@ -114,11 +125,14 @@ export default class Picada {
     const total = e.puntaje.total;
     const bueno = total >= PUNTAJE_FINAL_BUENO;
     const { width } = e.scale;
-    e.add.text(width / 2, 80, `PUNTAJE FINAL: ${total}`, estiloHud(40)).setOrigin(0.5).setDepth(CAPA.hud + 2);
-    e.add
-      .text(width / 2, 132, bueno ? 'FINAL ALTERNATIVO DESBLOQUEADO' : `FINAL HISTÓRICO (para el alternativo hacían falta ${PUNTAJE_FINAL_BUENO})`, estiloHud(22, { color: bueno ? TXT.verde : TXT.rojo }))
-      .setOrigin(0.5)
-      .setDepth(CAPA.hud + 2);
+    e.camara.interfaz(e.add.text(width / 2, 80, `PUNTAJE FINAL: ${total}`, estiloHud(40)).setOrigin(0.5).setDepth(CAPA.hud + 2).setScrollFactor(0));
+    e.camara.interfaz(
+      e.add
+        .text(width / 2, 132, bueno ? 'FINAL ALTERNATIVO DESBLOQUEADO' : `FINAL HISTÓRICO (para el alternativo hacían falta ${PUNTAJE_FINAL_BUENO})`, estiloHud(22, { color: bueno ? TXT.verde : TXT.rojo }))
+        .setOrigin(0.5)
+        .setDepth(CAPA.hud + 2)
+        .setScrollFactor(0)
+    );
   }
 
   // Con el puntaje alto se ve el final alternativo, donde Quiñones sobrevive. Con menos, el histórico, donde muere y aparece en gris
@@ -127,6 +141,7 @@ export default class Picada {
     const e = this.escena;
     const bueno = e.puntaje.total >= PUNTAJE_FINAL_BUENO;
     e.registry.set('finalMalo', !bueno);
+    e.multijugador.avisar('final', { malo: !bueno }); // Layla ve el mismo final (ver red/espejoFinal.js)
     if (bueno) e.scene.start('FinalAlternativoScene');
     else e.scene.start('CutsceneScene', { id: 'tributo' });
   }

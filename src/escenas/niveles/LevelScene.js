@@ -5,8 +5,11 @@ import { playSfx } from '../../sistemas/audio/audio.js';
 import { volMusica } from '../../sistemas/audio/ajustes.js';
 import Aliados from '../../sistemas/nivel/Aliados.js';
 import Altura from '../../sistemas/nivel/Altura.js';
+import { topeHud } from '../../ui/cabina.js';
 import Avance from '../../sistemas/nivel/Avance.js';
+import Camara from '../../sistemas/nivel/Camara.js';
 import Barreras from '../../sistemas/nivel/Barreras.js';
+import Obstaculos from '../../sistemas/nivel/Obstaculos.js';
 import BaseEnemiga from '../../sistemas/nivel/BaseEnemiga.js';
 import BombardeoEspecial from '../../sistemas/nivel/BombardeoEspecial.js';
 import Caidos from '../../sistemas/nivel/Caidos.js';
@@ -22,7 +25,7 @@ import PuntoDeControl from '../../sistemas/nivel/PuntoDeControl.js';
 import Puntaje from '../../sistemas/nivel/Puntaje.js';
 import Radio from '../../ui/nivel/Radio.js';
 import SoldadosEnemigos from '../../sistemas/nivel/SoldadosEnemigos.js';
-import { BALA_ESC, ESCALA_JUGADOR, GIRO_JUGADOR, PUNTOS, TECLAS, TONEL_SALTO, VELOCIDAD_JUGADOR, VIDA_JUGADOR } from '../../sistemas/nivel/constantes.js';
+import { BALA_ESC, CAMARA, FURIA_RADIO, ESCALA_JUGADOR, MARGEN_BORRADO, MARGEN_FONDO, GIRO_JUGADOR, PUNTOS, TECLAS, TONEL_SALTO, VELOCIDAD_JUGADOR, VIDA_JUGADOR } from '../../sistemas/nivel/constantes.js';
 
 // La escena base de los niveles (shooter vertical con scroll). Cada nivel solo pasa su configuración (ver Level1Scene,
 // Level2Scene y Level3Scene). Acá dejo lo central: el jugador, los controles, las colisiones, el daño y el bucle principal.
@@ -46,9 +49,14 @@ export default class LevelScene extends Phaser.Scene {
   create() {
     const { width, height } = this.scale;
     this.iniciarEstado();
-    this.cameras.main.fadeIn(350, 0, 0, 0); // entro desde negro, por ejemplo después del despegue
+    this.camara = new Camara(this); // tiene que ser lo primero: cada objeto que se agregue después pasa por ella
+    this.camara.fundirEntrada(350); // entro desde negro, por ejemplo después del despegue
 
-    this.fondo = this.add.tileSprite(0, 0, width, height, this.cfg.terreno).setOrigin(0).setDepth(0);
+    // Como la cámara se puede correr un poco, el terreno es más grande que la pantalla y el mundo físico deja salir al avión hasta el margen
+    // El avión no puede bajar más que el borde de arriba del tablero (menos la mitad de su tamaño), así nunca queda tapado por el HUD
+    this.sueloAvion = topeHud(height) - 40;
+    this.physics.world.setBounds(-CAMARA.margenX, -CAMARA.margenArriba, width + 2 * CAMARA.margenX, this.sueloAvion + CAMARA.margenArriba);
+    this.fondo = this.add.tileSprite(-MARGEN_FONDO, -MARGEN_FONDO, width + 2 * MARGEN_FONDO, height + 2 * MARGEN_FONDO, this.cfg.terreno).setOrigin(0).setDepth(0);
     this.enemigos = this.physics.add.group();
     this.balasJugador = this.physics.add.group();
     this.balasEnemigas = this.physics.add.group(); // las de los aviones: solo lastiman a mi avión
@@ -82,8 +90,8 @@ export default class LevelScene extends Phaser.Scene {
     // Multijugador: yo soy el piloto. Con Layla de estratega las torretas y la base aparecen mucho más arriba, así ella las ve venir
     const red = this.game.red;
     this.multi = this.registry.get('multi') === true && !!red?.activa && red.rol === 'piloto';
-    this.yNido = this.multi ? -480 : -80;
-    this.baseY0 = this.multi ? -480 : -130;
+    this.yNido = this.multi ? -480 : -260; // más arriba que antes: con la cámara corrida y el zoom alejado se ve bastante por encima de la pantalla
+    this.baseY0 = this.multi ? -480 : -300;
   }
 
   // El orden importa: el HUD va al final porque al crearse lee el estado de los demás módulos
@@ -96,6 +104,7 @@ export default class LevelScene extends Phaser.Scene {
     this.soldadosEnemigos = new SoldadosEnemigos(this);
     this.caidos = new Caidos(this);
     this.barreras = new Barreras(this);
+    this.obstaculos = new Obstaculos(this); // lo que los soldados rodean en vez de atravesar
     this.aviones = new Enemigos(this);
     this.especial = new BombardeoEspecial(this);
     this.habilidades = new Habilidades(this);
@@ -112,7 +121,7 @@ export default class LevelScene extends Phaser.Scene {
 
   crearJugador() {
     const { width, height } = this.scale;
-    this.jugador = this.physics.add.sprite(width / 2, height - 120, 'avion_jugador').setDepth(5);
+    this.jugador = this.physics.add.sprite(width / 2, Math.min(height - 120, this.sueloAvion - 10), 'avion_jugador').setDepth(5);
     this.jugador.play('nave_vuelo'); // la hélice ya viene animada en la hoja
     this.jugador.setScale(ESCALA_JUGADOR);
     this.jugador.setCollideWorldBounds(true);
@@ -252,6 +261,7 @@ export default class LevelScene extends Phaser.Scene {
     this.explosion(o.x, o.y, o.jefe ? 1.8 : 1.2);
     this.destruidos++;
     this.puntaje.sumar(o.jefe ? PUNTOS.base : PUNTOS.nido, o.x, o.y);
+    this.soldadosEnemigos.enfurecer(o.x, o.y, FURIA_RADIO); // los que la cuidaban salen a atacar
     ambiente.pulso('#ffd35a', 700, 0);
     const gana = o.jefe || (this.cfg.meta && this.destruidos >= this.cfg.meta);
     if (gana) this.terminarNivel();
@@ -292,6 +302,7 @@ export default class LevelScene extends Phaser.Scene {
     this.baseEnemiga.actualizar(dt);
     this.picada.vigilar();
     this.moverJugador(dt);
+    this.camara.actualizar(dt, this.jugador); // sigue al avión y aplica el zoom de la rueda
     this.altura.actualizar(dt);
     this.guiaBomba.dibujar(dt);
     this.multijugador.actualizarMarcas(dt);
@@ -360,12 +371,10 @@ export default class LevelScene extends Phaser.Scene {
     this.jugador.rotation = Phaser.Math.Angle.RotateTo(this.jugador.rotation, rumbo, GIRO_JUGADOR * dt);
   }
 
-  // Borro las balas que ya salieron de la pantalla
+  // Borro las balas que ya salieron de la pantalla (y de lo que se ve con la cámara corrida)
   limpiarBalas() {
     const { width, height } = this.scale;
-    [...this.balasJugador.getChildren()].forEach((b) => (b.y < -20 || b.y > height + 20 || b.x < -20 || b.x > width + 20) && b.destroy()); // ahora disparan hacia donde apunta el avión
-    [...this.balasEnemigas.getChildren(), ...this.balasTierra.getChildren()].forEach((b) => {
-      if (b.y > height + 20 || b.y < -20 || b.x < -20 || b.x > width + 20) b.destroy();
-    });
+    const fuera = (b) => b.y < -MARGEN_BORRADO || b.y > height + MARGEN_BORRADO || b.x < -MARGEN_BORRADO || b.x > width + MARGEN_BORRADO;
+    [...this.balasJugador.getChildren(), ...this.balasEnemigas.getChildren(), ...this.balasTierra.getChildren()].forEach((b) => fuera(b) && b.destroy());
   }
 }

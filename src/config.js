@@ -118,7 +118,7 @@ export const MANIFEST = {
     { key: 'retrato_quinones', url: 'assets/ui/retratos/retrato_quinones.png', w: 132, h: 132, color: 0x35506b },
     { key: 'retrato_protagonista', url: 'assets/ui/retratos/retrato_protagonista.png', w: 132, h: 132, color: 0x6b3550 },
     { key: 'retrato_presidente', url: 'assets/ui/retratos/retrato_presidente.png', w: 132, h: 132, color: 0x555555 },
-    { key: 'retrato_general', url: 'assets/ui/retratos/retrato_general.png', w: 132, h: 132, color: 0x4a5a3a }, // general de tierra (placeholder hasta dibujarlo)
+    { key: 'retrato_general', url: 'assets/ui/retratos/retrato_general.png', w: 132, h: 132, color: 0x4a5a3a }, // el comandante, el general de tierra con el que habla Layla
     // Torre de control de Layla (opcional): si existe, reemplaza el decorado dibujado por código. PNG de 1280x720.
     { key: 'torre_fondo', url: 'assets/ui/torre/torre_fondo.png', w: 1280, h: 720, color: 0x000000, opcional: true },
     // Base grande del Nivel 3 (opcional: si falta se usa el depósito agrandado). Ver Level3Scene (spriteBase).
@@ -162,7 +162,7 @@ export const MANIFEST = {
     { key: 'soldado_enemigo_dispara_abajo', url: 'assets/sprites/soldados/soldado_enemigo_dispara_abajo.png', fw: 72, fh: 72, frames: 4, color: 0x7a8a3a },
     // El soldado enemigo caminando hacia la derecha (7 cuadros). Hacia la izquierda se usa el mismo, espejado.
     { key: 'soldado_enemigo_derecha', url: 'assets/sprites/soldados/soldado_enemigo_derecha.png', fw: 72, fh: 72, frames: 7, color: 0x7a8a3a },
-    // Aún sin dibujar: hoja de caminata del soldado enemigo hacia abajo (usa placeholder y los enemigos no la usan hasta que exista).
+    // El soldado enemigo caminando hacia abajo (6 cuadros). Si el archivo faltara, se usa un placeholder y los enemigos no lo usan
     { key: 'soldado_enemigo_abajo', url: 'assets/sprites/soldados/soldado_enemigo_abajo.png', fw: 72, fh: 72, frames: 6, color: 0x7a8a3a },
   ],
   // Audio opcional: si falta el archivo, simplemente no suena.
