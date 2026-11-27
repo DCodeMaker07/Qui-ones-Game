@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
-"""Arma los sprites del general a partir de UNA imagen en cuadrícula de 2x2 (la que genera GPT).
+"""Arma los sprites del general a partir de UNA imagen (la que genera GPT), que puede venir de dos formas:
+  - una sola fila de 4 cuadros (la más cómoda, con fondo transparente), o
+  - una cuadrícula de 2x2.
+El script se da cuenta solo: si la imagen es mucho más ancha que alta, es una fila.
 
-Orden de las celdas: arriba-izquierda, arriba-derecha, abajo-izquierda, abajo-derecha
+Orden de los cuadros (de izquierda a derecha; en la cuadrícula, arriba-izquierda, arriba-derecha, abajo-izquierda, abajo-derecha)
   = boca cerrada, entreabierta, abierta, entreabierta.
 
 Salidas (en public/assets/ui/retratos/):
@@ -34,8 +37,12 @@ if a.fondo:
             if abs(r - c[0]) + abs(g - c[1]) + abs(b - c[2]) <= a.tol:
                 px[x, y] = (r, g, b, 0)
 
-w, h = im.width // 2, im.height // 2
-celdas = [im.crop((cx * w, cy * h, (cx + 1) * w, (cy + 1) * h)) for cy in range(2) for cx in range(2)]
+if im.width >= im.height * 3:  # una sola fila de 4 cuadros
+    w, h = im.width // 4, im.height
+    celdas = [im.crop((i * w, 0, (i + 1) * w, h)) for i in range(4)]
+else:  # cuadrícula de 2x2
+    w, h = im.width // 2, im.height // 2
+    celdas = [im.crop((cx * w, cy * h, (cx + 1) * w, (cy + 1) * h)) for cy in range(2) for cx in range(2)]
 
 # Un mismo recuadro para las cuatro celdas (la unión de lo dibujado), para que no se muevan al animar
 caja = None
