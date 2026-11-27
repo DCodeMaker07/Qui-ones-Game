@@ -117,10 +117,18 @@ export default class PreloadScene extends Phaser.Scene {
   }
 
   arrancar() {
-    // Atajos para grabar el video o probar: #nivel1 / #nivel2 / #nivel3 (saltan al nivel), #picada (Nivel 3 listo para la picada), #sinintro (salta la intro)
+    // Atajos para grabar el video o probar: #nivel1 / #nivel2 / #nivel3 (saltan al nivel), #picada (Nivel 3 listo para la picada), #despegue (el despegue antes del Nivel 1), #cierre y #cierre-malo (el cierre del ending del final alternativo y del histórico), #sinintro (salta la intro)
     const h = window.location.hash;
     if (h === '#nivel1' || h === '#nivel2' || h === '#nivel3') {
       this.scene.start(h === '#nivel1' ? 'Level1Scene' : h === '#nivel2' ? 'Level2Scene' : 'Level3Scene');
+      return;
+    }
+    if (h === '#cierre' || h === '#cierre-malo') {
+      this.scene.start('EndingScene', { cierre: h === '#cierre' ? 'alt' : 'historico' });
+      return;
+    }
+    if (h === '#despegue') {
+      this.scene.start('DespegueScene');
       return;
     }
     if (h === '#linea') {
@@ -136,7 +144,7 @@ export default class PreloadScene extends Phaser.Scene {
 
     // Los navegadores bloquean el audio hasta el primer clic o tecla: se pide uno antes de la intro
     // para que su música (y la del menú) suenen desde el principio.
-    this.txtCarga.setText('PRESIONA CUALQUIER TECLA PARA COMENZAR');
+    this.txtCarga.setText('PRESIONA CUALQUIER TECLA O BOTÓN DEL MANDO PARA COMENZAR');
     this.tweens.add({ targets: this.txtCarga, alpha: 0.3, duration: 700, yoyo: true, repeat: -1 });
     const ir = () => this.scene.start(destino);
     this.input.keyboard.once('keydown', ir);

@@ -60,9 +60,15 @@ export default class Modal {
       partes.push(t);
     });
 
-    if (pista) partes.push(escena.add.text(0, y0 + alto - 26, pista, { fontFamily: FUENTE, fontSize: '12px', color: TXT.grisOscuro }).setOrigin(0.5));
+    if (pista) {
+      this.pistaTxt = escena.add.text(0, y0 + alto - 26, pista, { fontFamily: FUENTE, fontSize: '12px', color: TXT.grisOscuro }).setOrigin(0.5); // la guardo para poder cambiarla (ver MenuPausa)
+      partes.push(this.pistaTxt);
+    }
 
     this.cont = escena.add.container(width / 2, height / 2, partes).setDepth(profundidad + 1);
+    this.velo.setScrollFactor(0); // el modal no se mueve con la cámara del nivel
+    this.cont.setScrollFactor(0);
+    escena.camara?.interfaz(this.velo, this.cont); // y lo dibuja la cámara de la interfaz (los niveles tienen una; las otras escenas no)
     this.ocultar();
 
     if (teclado) this.escucharTeclas();

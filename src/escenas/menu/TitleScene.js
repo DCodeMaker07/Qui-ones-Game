@@ -1,10 +1,13 @@
 import Phaser from 'phaser';
+import { entradaActual, estiloMando, fijarEstiloMando, registrarEntrada } from '../../sistemas/entrada/preferencias.js';
+import { nombreBoton } from '../../sistemas/entrada/etiquetas.js';
+import { ICONO_MANDO, ICONO_PLAYSTATION, ICONO_TECLADO, prepararIconosControles } from '../../ui/iconosControles.js';
 import { INFO } from '../../config.js';
 import FondoBatalla from '../../entidades/FondoBatalla.js';
 import { ajustes } from '../../sistemas/audio/ajustes.js';
 import { playSfx } from '../../sistemas/audio/audio.js';
-import { actualizarMusicaMenu, iniciarMusicaMenu } from '../../sistemas/audio/musicaMenu.js';
-import { AGUA_ESPERA, BOMBA_ESPERA, nombreTecla, RAFAGA_ESPERA, TECLAS, TONEL_ESPERA, ULTI_ESPERA } from '../../sistemas/nivel/constantes.js';
+import { actualizarMusicaMenu, detenerMusicaMenu, iniciarMusicaMenu } from '../../sistemas/audio/musicaMenu.js';
+import { AGUA_ESPERA, BOMBA_ESPERA, nombreTeclado, RAFAGA_ESPERA, TECLAS, TONEL_ESPERA, ULTI_ESPERA } from '../../sistemas/nivel/constantes.js';
 import { marcoRedondeado } from '../../ui/dibujo.js';
 import { COLOR, FUENTE, FUENTE_TITULO, FUENTE_UI, TXT } from '../../ui/tema.js';
 
@@ -24,17 +27,43 @@ const RETRATOS = [
   { key: 'yo_pixel', parpadeo: null, lado: 'izq', ancho: 420, alto: 560 }, // Créditos: yo, con marco dorado
 ];
 
-const CONTROLES = [
+// Los controles con teclado y mouse, y los del mando (los de las teclas salen de TECLAS). Cada uno es [acción, cómo se hace]
+const CONTROLES_TECLADO = [
   ['MOVER', 'FLECHAS'],
   ['BOMBA', `${TECLAS.bomba}  (recarga ${BOMBA_ESPERA} s)`],
   ['DISPARO', `${TECLAS.disparo}  (mantén pulsado)`],
   ['RÁFAGA', `${TECLAS.rafaga}  (recarga ${RAFAGA_ESPERA} s)`],
   ['ESPECIAL', `${TECLAS.especial}  (bombardeo de fuego, recarga ${ULTI_ESPERA} s)`],
-  ['ALTURA', `${nombreTecla(TECLAS.subir)} sube, ${TECLAS.bajar} baja (los enemigos te siguen)`],
+  ['ALTURA', `${nombreTeclado(TECLAS.subir)} sube, ${TECLAS.bajar} baja (los enemigos te siguen)`],
   ['TONEL', `${TECLAS.tonel}  (esquiva y devuelve las balas, recarga ${TONEL_ESPERA} s)`],
   ['AGUA', `${TECLAS.agua}  (apaga el fuego de la R, recarga ${AGUA_ESPERA} s)`],
-  ['RADIO', `${TECLAS.radio}  (hablas y Layla repite tu voz)`],
+  ['RADIO', `${TECLAS.radio}  (órdenes a Layla: "coloca barreras", "trae refuerzos", "que avancen más rápido")`],
   ['BOTIQUÍN', `${TECLAS.botiquin}  o decir "botiquín"`],
+  ['ZOOM', 'rueda del mouse (el mouse sirve también para los menús)'],
+];
+// Lo que hace cada botón del mando. Los botones salen con los nombres del estilo elegido (xbox o playstation), ver etiquetas.js
+const controlesMando = (estilo) => {
+  const b = (boton) => nombreBoton(boton, estilo);
+  return [
+    ['MOVER', 'stick izquierdo o cruceta'],
+    ['BOMBA', `${b('A')}  (recarga ${BOMBA_ESPERA} s)`],
+    ['DISPARO', `${b('RT')}  (mantén pulsado)`],
+    ['RÁFAGA', `${b('B')}  (recarga ${RAFAGA_ESPERA} s)`],
+    ['ESPECIAL', `${b('LT')}  (bombardeo de fuego, recarga ${ULTI_ESPERA} s)`],
+    ['ALTURA', `${b('RB')} sube, ${b('LB')} baja`],
+    ['TONEL', `${b('Y')}  (esquiva y devuelve las balas, recarga ${TONEL_ESPERA} s)`],
+    ['AGUA', `${b('X')}  (apaga el fuego de la R, recarga ${AGUA_ESPERA} s)`],
+    ['RADIO', `${b('R3')}  (apretar el stick derecho)   BOTIQUÍN: ${b('SEL')}`],
+    ['ZOOM', 'stick derecho: arriba acerca, abajo aleja'],
+    ['PAUSA', `${b('START')}  (en los menús, ${b('A')} acepta y ${b('B')} vuelve)`],
+  ];
+};
+// Las tres opciones del panel: teclado y mouse, y el mando con los botones de Xbox o de PlayStation. Un mando de PlayStation conectado con un
+// adaptador que lo hace pasar por Xbox le llega así al navegador, por eso el estilo se elige a mano
+const OPCIONES_CONTROL = [
+  { clave: ICONO_TECLADO, etiqueta: 'TECLADO Y MOUSE', entrada: 'teclado', lista: () => CONTROLES_TECLADO },
+  { clave: ICONO_MANDO, etiqueta: 'MANDO XBOX', entrada: 'mando', estilo: 'xbox', lista: () => controlesMando('xbox') },
+  { clave: ICONO_PLAYSTATION, etiqueta: 'MANDO PLAYSTATION', entrada: 'mando', estilo: 'playstation', lista: () => controlesMando('playstation') },
 ];
 
 const FILAS_AUDIO = [
@@ -54,6 +83,7 @@ export default class TitleScene extends Phaser.Scene {
   }
 
   create() {
+    this.saliendo = false; // la escena se reutiliza: al volver del ending tiene que poder volver a salir
     const { width, height } = this.scale;
     // Al entrar no debe quedar sonando (ni en pausa) la música de otra escena: nivel, diálogos o créditos
     this.sound.sounds.forEach((s) => {
@@ -200,7 +230,8 @@ export default class TitleScene extends Phaser.Scene {
     ['RIGHT', 'D'].forEach((k) => kb.on(`keydown-${k}`, () => this.mover(1)));
     ['UP', 'W'].forEach((k) => kb.on(`keydown-${k}`, () => this.moverFilaAudio(-1)));
     ['DOWN', 'S'].forEach((k) => kb.on(`keydown-${k}`, () => this.moverFilaAudio(1)));
-    ['ENTER', 'SPACE'].forEach((k) => kb.on(`keydown-${k}`, () => (this.panelAbierto ? this.cerrarPanel() : this.pulsar(this.sel))));
+    // Con el panel de Créditos abierto, ENTER o ESPACIO muestran el ending; con otro panel abierto lo cierran
+    ['ENTER', 'SPACE'].forEach((k) => kb.on(`keydown-${k}`, () => (this.panelAbierto ? this.alAceptarPanel() : this.pulsar(this.sel))));
     kb.on('keydown-ESC', () => this.cerrarPanel());
   }
 
@@ -277,6 +308,8 @@ export default class TitleScene extends Phaser.Scene {
 
   mover(d) {
     if (this.panelAbierto && this.panelTipo !== 'creditos') {
+      // Con el panel de Controles abierto, izquierda y derecha eligen entre teclado y mando
+      if (this.panelTipo === 'controles') return this.elegirControl(Phaser.Math.Clamp(this.controlSel + d, 0, OPCIONES_CONTROL.length - 1));
       // Con el panel de Audio abierto, izquierda y derecha cambian el volumen de la fila elegida
       if (this.panelTipo === 'audio') this.fijarAudio(this.filaAudio, ajustes.get(FILAS_AUDIO[this.filaAudio].clave) + d * 0.1);
       return;
@@ -326,7 +359,7 @@ export default class TitleScene extends Phaser.Scene {
       this.iniciando = true;
       this.time.delayedCall(170, () => this.scene.start('DniScene')); // espero un instante para que se vea la animación
     } else if (opcion === 'Controles') {
-      this.abrirPanel('CONTROLES', CONTROLES.map(([a, b]) => a.padEnd(11) + b).join('\n'), 'left', 16, 6); // letra más chica: son 10 líneas
+      this.abrirControles();
     } else if (opcion === 'Audio') {
       this.abrirAudio();
     } else if (!this.panelAbierto) {
@@ -365,19 +398,91 @@ export default class TitleScene extends Phaser.Scene {
   crearPanelTexto() {
     const { width, height } = this.scale;
     const zona = this.add.rectangle(0, 0, 660, 400, 0, 0).setInteractive(); // cierra el panel al hacer clic y tapa lo de atrás
-    zona.on('pointerdown', () => this.cerrarPanel());
+    zona.on('pointerdown', () => this.alAceptarPanel()); // el clic hace lo mismo que ENTER
     this.panelTitulo = this.add.text(0, -165, '', { fontFamily: FUENTE_UI, fontStyle: 'bold', fontSize: '30px', color: TXT.naranja }).setOrigin(0.5);
     this.panelCuerpo = this.add.text(0, 5, '', { fontFamily: FUENTE, fontSize: '19px', color: TXT.blanco, lineSpacing: 10 }).setOrigin(0.5);
-    const pista = this.add.text(0, 172, 'ESC / ENTER: VOLVER', { fontFamily: FUENTE, fontSize: '12px', color: TXT.grisOscuro }).setOrigin(0.5);
-    this.panel = this.add.container(width / 2, height / 2 - 35, [this.marcoDePanel(), zona, this.panelTitulo, this.panelCuerpo, pista]).setDepth(40).setVisible(false);
+    this.panelPista = this.add.text(0, 172, 'ESC / ENTER: VOLVER', { fontFamily: FUENTE, fontSize: '12px', color: TXT.grisOscuro }).setOrigin(0.5);
+    this.panel = this.add.container(width / 2, height / 2 - 35, [this.marcoDePanel(), zona, this.panelTitulo, this.panelCuerpo, this.panelPista]).setDepth(40).setVisible(false);
+    this.crearOpcionesDeControl();
+  }
+
+  // Las dos opciones del panel de Controles, en una sola fila: un teclado con mouse y un mando, en pixel art. La elegida lleva el borde
+  // naranja; la otra queda apagada. Se eligen con las flechas izquierda y derecha o con un clic
+  crearOpcionesDeControl() {
+    prepararIconosControles(this);
+    this.controlSel = 0;
+    this.ctrlBotones = OPCIONES_CONTROL.map((op, i) => {
+      const x = (i - 1) * 150; // tres opciones en una fila
+      const marco = this.add.graphics();
+      const icono = this.add.image(0, -10, op.clave).setScale(2);
+      const etiqueta = this.add.text(0, 26, op.etiqueta, { fontFamily: FUENTE_UI, fontStyle: 'bold', fontSize: '11px', color: TXT.gris }).setOrigin(0.5);
+      const zona = this.add.rectangle(0, 0, 140, 80, 0, 0).setInteractive({ useHandCursor: true });
+      const boton = this.add.container(x, -100, [marco, icono, etiqueta, zona]).setVisible(false);
+      zona.on('pointerdown', () => this.elegirControl(i));
+      boton.pintar = (elegido) => {
+        marco.clear();
+        marcoRedondeado(marco, -70, -40, 140, 80, 14, { relleno: elegido ? 0x1a2430 : COLOR.fondo, alfaRelleno: 1, borde: elegido ? COLOR.naranja : 0x59626e });
+        icono.setAlpha(elegido ? 1 : 0.55);
+        etiqueta.setColor(elegido ? TXT.naranja : TXT.gris);
+      };
+      this.panel.add(boton);
+      return boton;
+    });
+  }
+
+  // Abre el panel de Controles: arriba los dos íconos y abajo la lista de lo que hace cada tecla o botón del que esté elegido
+  abrirControles() {
+    // abre en lo que estoy usando (se guarda en localStorage): teclado, mando Xbox o mando PlayStation
+    this.controlSel = entradaActual() === 'mando' ? (estiloMando() === 'playstation' ? 2 : 1) : 0;
+    this.panelTitulo.setText('CONTROLES');
+    this.panelTipo = 'controles';
+    this.panelPista.setText('← →: ELEGIR   ·   ESC / ENTER: VOLVER');
+    this.ctrlBotones.forEach((b) => b.setVisible(true));
+    this.pintarControles();
+    this.panelAbierto = true;
+    this.mostrarPanel(this.panel);
+  }
+
+  elegirControl(i) {
+    if (this.panelTipo !== 'controles' || i === this.controlSel || i < 0 || i >= OPCIONES_CONTROL.length) return;
+    this.controlSel = i;
+    const opcion = OPCIONES_CONTROL[i];
+    registrarEntrada(opcion.entrada); // si lo elijo a mano, lo recuerdo también
+    if (opcion.estilo) fijarEstiloMando(opcion.estilo);
+    playSfx(this, 'sfx_menu_mover', { volume: 0.5 });
+    this.pintarControles();
+  }
+
+  pintarControles() {
+    this.ctrlBotones.forEach((b, i) => b.pintar(i === this.controlSel));
+    const lista = OPCIONES_CONTROL[this.controlSel].lista();
+    this.panelCuerpo.setText(lista.map(([a, b]) => a.padEnd(11) + b).join('\n')).setAlign('left').setFontSize(14).setLineSpacing(4).setY(62);
   }
 
   abrirPanel(titulo, cuerpo, alineacion, tam = 19, espacio = 10, tipo = 'texto') {
     this.panelTitulo.setText(titulo);
-    this.panelCuerpo.setText(cuerpo).setAlign(alineacion).setFontSize(tam).setLineSpacing(espacio);
+    this.ctrlBotones.forEach((b) => b.setVisible(false)); // las opciones de teclado y mando son solo de Controles
+    this.panelCuerpo.setText(cuerpo).setAlign(alineacion).setFontSize(tam).setLineSpacing(espacio).setY(5);
     this.panelTipo = tipo;
+    this.panelPista.setText(tipo === 'creditos' ? 'ENTER / CLIC: VER EL ENDING   ·   ESC: VOLVER' : 'ESC / ENTER: VOLVER');
     this.panelAbierto = true;
     this.mostrarPanel(this.panel);
+  }
+
+  // Lo que hacen ENTER, ESPACIO o el clic sobre un panel abierto: en Créditos muestran el ending y en los demás cierran el panel
+  alAceptarPanel() {
+    if (this.panelTipo !== 'creditos') return this.cerrarPanel();
+    this.verEnding();
+  }
+
+  // Desde los Créditos paso al ending completo. Con desdeTitulo, al terminar vuelve acá en vez de ir a la línea de tiempo
+  verEnding() {
+    if (this.saliendo) return;
+    this.saliendo = true;
+    playSfx(this, 'sfx_menu_ok', { volume: 0.7 });
+    detenerMusicaMenu(this, 500);
+    this.cameras.main.fadeOut(500, 0, 0, 0);
+    this.time.delayedCall(550, () => this.scene.start('EndingScene', { desdeTitulo: true }));
   }
 
   cerrarPanel(sonido = true) {

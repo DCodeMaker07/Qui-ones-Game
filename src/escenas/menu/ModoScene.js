@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { RED } from '../../config.js';
 import FondoBatalla from '../../entidades/FondoBatalla.js';
 import { detenerMusicaMenu, iniciarMusicaMenu } from '../../sistemas/audio/musicaMenu.js';
+import { navegarConMando } from '../../sistemas/entrada/navegacionDom.js';
 
 // Lo que viene después del DNI: elijo un jugador o multijugador.
 //  - Multijugador: el piloto (Quiñones) CREA una sala y comparte el código; la estratega (Layla) se UNE con él.
@@ -31,6 +32,7 @@ export default class ModoScene extends Phaser.Scene {
     this.add.rectangle(0, 0, width, height, 0x000000, 0.55).setOrigin(0).setDepth(20);
 
     this.construirDom();
+    this.nav = navegarConMando(this, this.dom); // con el mando: la cruceta resalta un botón y A lo pulsa
     this.vista('modo');
 
     // Lo que me avisa el servidor
@@ -51,6 +53,7 @@ export default class ModoScene extends Phaser.Scene {
 
     this.events.once('shutdown', () => {
       Object.entries(this.escuchas).forEach(([t, fn]) => ev.off(t, fn));
+      this.nav.destruir();
       this.dom.remove();
     });
   }
@@ -146,6 +149,7 @@ export default class ModoScene extends Phaser.Scene {
   vista(nombre) {
     this.vistaActual = nombre;
     this.dom.querySelectorAll('[data-vista]').forEach((s) => s.classList.toggle('hidden', s.dataset.vista !== nombre));
+    this.nav?.reiniciar(); // el resaltado del mando vuelve al primer botón de la pantalla nueva
     this.mostrarError('');
     this.info('');
   }
@@ -168,6 +172,7 @@ export default class ModoScene extends Phaser.Scene {
   accion_solo() {
     this.game.red.salir();
     this.registry.set('multi', false);
+    this.registry.set('misionTerminada', false);
     this.registry.set('invencible', false);
     detenerMusicaMenu(this);
     this.scene.start('CutsceneScene', { id: 'palacio' });
@@ -219,6 +224,7 @@ export default class ModoScene extends Phaser.Scene {
     localStorage.setItem('quinones-invencible', invencible ? '1' : '0');
     this.registry.set('invencible', invencible);
     this.registry.set('multi', true);
+    this.registry.set('misionTerminada', false);
     this.registry.set('rol', 'piloto');
     detenerMusicaMenu(this);
     this.scene.start('CutsceneScene', { id: 'palacio' });
@@ -262,6 +268,7 @@ export default class ModoScene extends Phaser.Scene {
   comenzarComoEstratega() {
     if (this.red.rol !== 'estratega') return;
     this.registry.set('multi', true);
+    this.registry.set('misionTerminada', false);
     this.registry.set('rol', 'estratega');
     detenerMusicaMenu(this);
     this.scene.start('CutsceneScene', { id: 'comando' }); // su historia va en paralelo y después viene la mesa de mando

@@ -1,4 +1,6 @@
 import Modal from '../Modal.js';
+import { usandoMando } from '../../sistemas/entrada/preferencias.js';
+import { nombreBoton } from '../../sistemas/entrada/etiquetas.js';
 
 // Menú de pausa (ESC o P). Congelo el nivel y abro un Modal con las tres opciones.
 // La música del nivel sigue sonando mientras tanto, no la toco.
@@ -36,6 +38,8 @@ export default class MenuPausa {
     window.speechSynthesis?.cancel();
     e.game.voice?.cancelarEscucha();
     e.multijugador.avisarPausa(true); // Layla también se pausa
+    // La ayuda de abajo cambia si juego con mando
+    this.modal.pistaTxt?.setText(usandoMando() ? `CRUCETA + ${nombreBoton('A')}      ${nombreBoton('B')} O START: CONTINUAR` : 'FLECHAS + ENTER      ESC: CONTINUAR');
     this.modal.abrir();
   }
 

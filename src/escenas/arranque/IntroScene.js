@@ -4,9 +4,6 @@ import { ambiente } from '../../sistemas/efectos/Ambiente.js';
 import { playSfx } from '../../sistemas/audio/audio.js';
 import { volMusica } from '../../sistemas/audio/ajustes.js';
 
-// Intro sobria, inspirada en la de GTA IV: fondo negro, el logo, su variante y el título del juego. Nada más.
-// Si existen assets/intro/logo.png y logo_variante.png se usan; si no, se dibuja un logo con texto.
-// Música opcional: assets/audio/musica/musica_intro.mp3. Se salta con cualquier tecla o clic.
 const separar = (t) => t.split('').join(' ');
 
 export default class IntroScene extends Phaser.Scene {
@@ -23,7 +20,7 @@ export default class IntroScene extends Phaser.Scene {
     ambiente.escena('intro');
 
     this.add
-      .text(cx, height - 26, 'CUALQUIER TECLA: SALTAR', { fontFamily: FUENTE, fontSize: '11px', color: '#444444' })
+      .text(cx, height - 26, 'CUALQUIER TECLA O BOTÓN DEL MANDO: SALTAR', { fontFamily: FUENTE, fontSize: '11px', color: '#444444' })
       .setOrigin(0.5);
     this.input.keyboard.once('keydown', () => this.irAlMenu());
     this.input.once('pointerdown', () => this.irAlMenu());

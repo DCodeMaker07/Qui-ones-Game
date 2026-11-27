@@ -1,3 +1,5 @@
+import { alCambiarEntrada, recienCambiada, usandoMando } from '../../sistemas/entrada/preferencias.js';
+import { nombreBoton } from '../../sistemas/entrada/etiquetas.js';
 import { reiniciarPuntaje } from '../../sistemas/nivel/Puntaje.js';
 import Phaser from 'phaser';
 import { FUENTE, FUENTE_TITULO } from '../../config.js';
@@ -49,8 +51,10 @@ export default class DniScene extends Phaser.Scene {
       this.confirmar();
     };
     this.ui.form.addEventListener('submit', this.onSubmit);
+    this.crearTeclado();
 
     this.events.once('shutdown', () => {
+      this.quitarTeclado();
       this.ui.form.removeEventListener('submit', this.onSubmit);
       this.ui.overlay.classList.add('hidden');
       this.ui.overlay.classList.remove('flex');
@@ -60,6 +64,121 @@ export default class DniScene extends Phaser.Scene {
 
   update(_, delta) {
     this.fondo.update(delta);
+  }
+
+  // ---------- teclado numérico para jugar con mando ----------
+
+  // Si hay un mando conectado muestro debajo del campo un teclado numérico (1 al 9, borrar, 0, listo) y, si hace falta elegir el género, dos
+  // botones H y M. Se mueve con la cruceta o el stick, A pulsa la tecla y B vuelve al menú (el Mando.js manda esas flechas y el ENTER como
+  // teclas virtuales, que se distinguen de las reales porque su "code" va en mayúsculas)
+  crearTeclado() {
+    this.teclas = [
+      { texto: '1', valor: '1' }, { texto: '2', valor: '2' }, { texto: '3', valor: '3' },
+      { texto: '4', valor: '4' }, { texto: '5', valor: '5' }, { texto: '6', valor: '6' },
+      { texto: '7', valor: '7' }, { texto: '8', valor: '8' }, { texto: '9', valor: '9' },
+      { texto: 'BORRAR', valor: 'borrar', pequena: true }, { texto: '0', valor: '0' }, { texto: 'LISTO', valor: 'listo', pequena: true },
+      // Estos dos solo aparecen si el DNI no está en la base de prueba y hay que elegir el género (ver mostrarGenero)
+      { texto: 'H (hombre)', valor: 'H', pequena: true, genero: true }, { texto: 'M (mujer)', valor: 'M', pequena: true, genero: true },
+    ];
+    this.generoVisible = false;
+    this.tecladoSel = 4; // empieza en el 5, en el centro
+    this.rejilla = document.createElement('div');
+    this.rejilla.className = 'dni-teclado hidden';
+    this.botonesTeclado = this.teclas.map((t, i) => {
+      const boton = document.createElement('button');
+      boton.type = 'button';
+      boton.textContent = t.texto;
+      if (t.pequena) boton.classList.add('pequena');
+      if (t.genero) boton.classList.add('hidden'); // se muestran cuando hace falta
+      boton.addEventListener('click', () => {
+        this.tecladoSel = i;
+        this.pulsarTecla();
+      });
+      this.rejilla.appendChild(boton);
+      return boton;
+    });
+    this.pistaTeclado = document.createElement('p');
+    this.pistaTeclado.className = 'dni-teclado-pista hidden';
+    const pistaDeBotones = () => (this.pistaTeclado.textContent = `Cruceta o stick: mover  ·  ${nombreBoton('A')}: pulsar  ·  ${nombreBoton('B')}: volver`);
+    pistaDeBotones();
+    this.quitarAvisoEstilo = alCambiarEntrada(pistaDeBotones); // si cambia el estilo del mando se actualiza
+    this.ui.hint.after(this.rejilla, this.pistaTeclado);
+
+    const virtual = (evento) => evento?.code === 'ENTER' || evento?.code === 'SPACE'; // las del mando, no las del teclado de verdad
+    const kb = this.input.keyboard;
+    kb.on('keydown-LEFT', () => this.moverTeclado(-1, 0));
+    kb.on('keydown-RIGHT', () => this.moverTeclado(1, 0));
+    kb.on('keydown-UP', () => this.moverTeclado(0, -1));
+    kb.on('keydown-DOWN', () => this.moverTeclado(0, 1));
+    kb.on('keydown-ENTER', (evento) => virtual(evento) && !recienCambiada() && this.pulsarTecla()); // el botón con el que despierto el mando no cuenta
+
+    // El teclado en pantalla solo se ve si juego con mando: hay un mando conectado Y lo último que usé fue el mando (no el teclado ni el mouse).
+    // Se actualiza al conectar o desconectar el mando y cada vez que cambio de uno a otro (ver preferencias.js)
+    this.alConectar = () => this.mostrarTeclado(this.conMando());
+    window.addEventListener('gamepadconnected', this.alConectar);
+    window.addEventListener('gamepaddisconnected', this.alConectar);
+    this.quitarAvisoDispositivo = alCambiarEntrada(() => this.mostrarTeclado(this.conMando()));
+    this.mostrarTeclado(this.conMando());
+  }
+
+  conMando() {
+    return usandoMando() && this.hayMando();
+  }
+
+  hayMando() {
+    return [...(navigator.getGamepads?.() ?? [])].some((m) => m && m.connected);
+  }
+
+  mostrarTeclado(visible) {
+    this.rejilla.classList.toggle('hidden', !visible);
+    this.pistaTeclado.classList.toggle('hidden', !visible);
+    this.tecladoVisible = visible;
+    if (visible) this.ui.dni.blur(); // con el mando no hace falta el cursor del campo
+    else this.ui.dni.focus(); // con teclado y mouse se escribe directo en el campo
+    this.pintarTeclado();
+  }
+
+  pintarTeclado() {
+    this.botonesTeclado?.forEach((b, i) => b.classList.toggle('sel', i === this.tecladoSel));
+  }
+
+  // La cruceta mueve la tecla elegida por la rejilla de 3 columnas; en los bordes no da la vuelta
+  moverTeclado(dx, dy) {
+    if (!this.tecladoVisible) return;
+    const col = Phaser.Math.Clamp((this.tecladoSel % 3) + dx, 0, 2);
+    const fila = Phaser.Math.Clamp(Math.floor(this.tecladoSel / 3) + dy, 0, this.generoVisible ? 4 : 3);
+    this.tecladoSel = Math.min(fila * 3 + col, this.generoVisible ? 13 : 11); // la última fila solo tiene H y M
+    this.pintarTeclado();
+  }
+
+  pulsarTecla() {
+    if (!this.tecladoVisible) return;
+    const { valor } = this.teclas[this.tecladoSel];
+    this.ui.error.classList.add('hidden');
+    if (valor === 'listo') return this.confirmar();
+    if (valor === 'H' || valor === 'M') {
+      this.ui.genero.value = valor; // elijo el género; después se pulsa LISTO
+      this.botonesTeclado.forEach((b, i) => b.classList.toggle('activa', this.teclas[i].genero && this.teclas[i].valor === valor));
+      return;
+    }
+    if (valor === 'borrar') this.ui.dni.value = this.ui.dni.value.slice(0, -1);
+    else if (this.ui.dni.value.length < 8) this.ui.dni.value += valor;
+  }
+
+  // Si hay que elegir el género muestro los botones H y M debajo del teclado
+  mostrarGenero() {
+    if (!this.botonesTeclado) return;
+    this.generoVisible = true;
+    this.teclas.forEach((t, i) => t.genero && this.botonesTeclado[i].classList.remove('hidden'));
+  }
+
+  quitarTeclado() {
+    this.quitarAvisoEstilo?.();
+    window.removeEventListener('gamepadconnected', this.alConectar);
+    window.removeEventListener('gamepaddisconnected', this.alConectar);
+    this.quitarAvisoDispositivo?.();
+    this.rejilla?.remove();
+    this.pistaTeclado?.remove();
   }
 
   mostrarError(msg) {
@@ -75,6 +194,7 @@ export default class DniScene extends Phaser.Scene {
     if (!genero) {
       // Si el DNI no está en mi base de prueba, dejo elegir H o M a mano
       this.ui.manual.classList.remove('hidden');
+      this.mostrarGenero();
       genero = this.ui.genero.value;
       if (!genero) return this.mostrarError('DNI no está en la base de prueba. Elige tu género (H/M) para continuar.');
     }
