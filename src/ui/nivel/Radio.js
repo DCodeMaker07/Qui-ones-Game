@@ -1,8 +1,8 @@
 import { FUENTE_UI, MARGEN, CAPA, TXT } from '../tema.js';
-import { crearVidrio } from '../vidrio.js';
+import { METAL, remache } from '../cabina.js';
 import { ambiente } from '../../sistemas/efectos/Ambiente.js';
 
-// La radio como un chat a la izquierda de la pantalla: solo el nombre y el mensaje, dentro de un recuadro de vidrio transparente.
+// La radio como un chat a la izquierda de la pantalla: solo el nombre y el mensaje, dentro de una placa de metal oscuro con una franja ámbar.
 // Cada mensaje nuevo aparece abajo y el recuadro crece hacia arriba. Al llegar al alto máximo se hace scroll solo: lo viejo
 // sube y se recorta por arriba, así siempre se ve lo último. Cada mensaje se apaga a los pocos segundos.
 // Acá también están los comandos por voz del modo un jugador. En multijugador la radio la maneja Multijugador.js, que usa
@@ -14,10 +14,20 @@ export function esPedidoBotiquin(texto) {
   return /botiqu|suministro|medic|curar|ayuda/i.test(sinAcentos(texto));
 }
 
-// Para pedir refuerzos hay que decir "refuerzo" y además la ubicación o la base: "Encontré la ubicación, necesito refuerzos"
+// Pedir refuerzos: "trae refuerzos", "necesito refuerzos", "manda más soldados"...
 export function esPedidoRefuerzos(texto) {
+  return /refuerzo|mas soldados|manda soldados|trae soldados/.test(sinAcentos(texto).toLowerCase());
+}
+
+// "Layla, coloca barreras" (también muros, escudos, cobertura...)
+export function esPedidoBarreras(texto) {
+  return /barrera|muro|escudo|cobertura|trinchera|parapeto/.test(sinAcentos(texto).toLowerCase());
+}
+
+// "Layla, que avancen más rápido los soldados": una palabra de velocidad y otra que hable de los soldados o de avanzar
+export function esPedidoVelocidad(texto) {
   const limpio = sinAcentos(texto).toLowerCase();
-  return /refuerzo/.test(limpio) && /ubicaci|encontr|localiz|base|posicion/.test(limpio);
+  return /rapid|veloc|apur|prisa|corr|aceler/.test(limpio) && /soldado|avanc|marcha|tropa|aliado|camin/.test(limpio);
 }
 
 const ANCHO = 380;
@@ -37,12 +47,14 @@ export default class Radio {
     this.x = MARGEN;
     this.abajo = escena.scale.height - 155; // el borde de abajo del chat, justo arriba del retrato de Quiñones
 
-    this.vidrio = crearVidrio(escena, this.x, this.abajo - 40, ANCHO, 40).setVisible(false); // el recuadro de vidrio, que crece con los mensajes
+    this.placa = escena.add.graphics(); // la placa de metal, que se redibuja más grande con cada mensaje
     this.contenido = escena.add.container(this.x + RELLENO, 0);
     // La máscara recorta lo que sube por arriba del recuadro cuando hay scroll
     this.mascara = escena.make.graphics({ add: false });
+    this.mascara.setScrollFactor(0); // la radio y su máscara no se mueven con la cámara del nivel
     this.contenido.setMask(this.mascara.createGeometryMask());
-    this.cont = escena.add.container(0, 0, [this.vidrio, this.contenido]).setDepth(CAPA.radio);
+    this.cont = escena.add.container(0, 0, [this.placa, this.contenido]).setDepth(CAPA.radio).setScrollFactor(0);
+    escena.camara.interfaz(this.cont);
   }
 
   // texto: lo que se dice. "Layla: ..." y "Torre: ..." son de Layla y "Tú: ..." es mío; todo lo demás también lo dice la torre.
@@ -53,6 +65,7 @@ export default class Radio {
     const nombre = e.add.text(0, 0, AUTORES[autor].nombre, { fontFamily: FUENTE_UI, fontStyle: 'bold', fontSize: '13px', color: AUTORES[autor].color });
     const mensaje = e.add.text(0, 0, cuerpo, { fontFamily: FUENTE_UI, fontSize: '16px', color: TXT.blanco, lineSpacing: 2, wordWrap: { width: ANCHO - RELLENO * 2 } });
     this.contenido.add([nombre, mensaje]);
+    e.camara.interfaz(nombre, mensaje); // los textos nuevos también son interfaz
     const m = { nombre, mensaje, alto: nombre.height + mensaje.height + 2 };
     this.mensajes.push(m);
     [nombre, mensaje].forEach((t) => t.setAlpha(0));
@@ -98,17 +111,33 @@ export default class Radio {
     const scroll = Math.max(0, total - ALTO_MAX); // lo que se pasó del alto máximo
 
     this.mascara.clear();
-    this.vidrio.setVisible(this.mensajes.length > 0);
+    this.placa.clear();
     if (this.mensajes.length) {
-      this.vidrio.setPosition(this.x, arriba).setSize(ANCHO, alto);
+      this.dibujarPlaca(arriba, alto);
       this.mascara.fillStyle(0xffffff, 1).fillRect(this.x, arriba + 4, ANCHO, alto - 8);
     }
     this.escena.tweens.killTweensOf(this.contenido);
     this.escena.tweens.add({ targets: this.contenido, y: arriba + RELLENO - scroll, duration: 200, ease: 'Cubic.easeOut' });
   }
 
+  // La placa: metal oscuro con borde gris, una franja ámbar a la izquierda y remaches en las esquinas
+  dibujarPlaca(arriba, alto) {
+    const g = this.placa;
+    g.fillStyle(0x151a20, 0.92).fillRoundedRect(this.x, arriba, ANCHO, alto, 8);
+    g.lineStyle(2, METAL.borde, 1).strokeRoundedRect(this.x, arriba, ANCHO, alto, 8);
+    g.fillStyle(METAL.ambar, 1).fillRect(this.x + 3, arriba + 10, 3, alto - 20);
+    [[this.x + 12, arriba + 6], [this.x + ANCHO - 8, arriba + 6], [this.x + 12, arriba + alto - 6], [this.x + ANCHO - 8, arriba + alto - 6]].forEach(([rx, ry]) => remache(g, rx, ry, 2));
+  }
+
   ocultar() {
     this.cont.setVisible(false);
+  }
+
+  // Lo que Layla me contesta después de una orden: lo escribe en la radio y lo dice con su voz
+  responder(texto) {
+    if (!texto) return;
+    this.mostrar('Layla: ' + texto, { duracion: 4500 });
+    this.escena.game.voice?.hablar(texto, undefined, 'M'); // Layla siempre responde con voz de mujer
   }
 
   // Modo un jugador: hablo yo (tecla T), Layla repite con la voz que corresponde al DNI y después responde
@@ -123,11 +152,17 @@ export default class Radio {
       onTexto: (dicho) => {
         e.hud.pilotoHabla(1500);
         const enBase = e.fase === 'base';
-        const pideRefuerzos = enBase && esPedidoRefuerzos(dicho);
-        const pideBotiquin = esPedidoBotiquin(dicho);
+        const pideBarreras = esPedidoBarreras(dicho);
+        const pideVelocidad = esPedidoVelocidad(dicho);
+        const pideRefuerzos = !pideBarreras && !pideVelocidad && esPedidoRefuerzos(dicho);
+        const pideBotiquin = !pideBarreras && !pideVelocidad && !pideRefuerzos && esPedidoBotiquin(dicho);
         this.mostrar('Tú: ' + dicho, { duracion: 4500 });
+        // Después de repetir lo que dije, Layla hace lo que le pedí y me contesta
         voz.hablar(dicho, () => {
-          if (pideRefuerzos) e.time.delayedCall(300, () => e.baseEnemiga.llamarRefuerzos());
+          if (pideBarreras) e.time.delayedCall(300, () => this.responder(e.barreras.ponerGrupo()));
+          else if (pideVelocidad) e.time.delayedCall(300, () => this.responder(e.soldados.acelerar()));
+          else if (pideRefuerzos && enBase) e.time.delayedCall(300, () => e.baseEnemiga.llamarRefuerzos()); // con la base a la vista, los refuerzos del asedio
+          else if (pideRefuerzos) e.time.delayedCall(300, () => this.responder(e.soldados.traerRefuerzos()));
           else if (enBase && !pideBotiquin) e.baseEnemiga.refuerzoNoEntendido();
         });
         if (pideBotiquin) e.time.delayedCall(1500, () => e.botiquin.pedir());
