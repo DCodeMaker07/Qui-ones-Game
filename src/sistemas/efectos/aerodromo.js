@@ -1,17 +1,22 @@
 import Phaser from 'phaser';
 
 // Lo que dibujo por código para el aeródromo: la pista de aterrizaje, la torre de control, el hangar, la plataforma de concreto
-// y la manga de viento. Todo se ve desde arriba, igual que el juego. Lo usan el despegue antes del Nivel 1 (DespegueScene) y el
-// aterrizaje del ending. El sol viene de arriba a la izquierda, así que todas las sombras caen hacia abajo y a la derecha.
+// y la manga de viento. Todo se ve desde arriba, igual que el juego. Lo uso en el despegue antes del Nivel 1 (DespegueScene) y en el
+// aterrizaje del ending. Pongo el sol arriba a la izquierda, así que todas las sombras caen hacia abajo y a la derecha.
 
 export const PISTA = 'pista_aterrizaje';
 
 // La pista: asfalto con granito, bordes blancos, línea central discontinua y luces amarillas a los costados.
-// Es un mosaico de 160x256 que se repite hacia arriba y abajo
+// La dibujo como un mosaico de 160x256 que se repite hacia arriba y abajo
 export function prepararPista(escena) {
   if (escena.textures.exists(PISTA)) return;
   const tex = escena.textures.createCanvas(PISTA, 160, 256);
-  const ctx = tex.getContext();
+  dibujarPista(tex.getContext());
+  tex.refresh();
+}
+
+// El dibujo de la pista en un contexto 2D de 160x256. Lo uso para la textura de Phaser (arriba) y para la de Three.js (DespegueTresD.js)
+export function dibujarPista(ctx) {
   ctx.fillStyle = '#3b3b42';
   ctx.fillRect(0, 0, 160, 256);
   for (let i = 0; i < 260; i++) {
@@ -27,10 +32,9 @@ export function prepararPista(escena) {
     ctx.fillRect(0, y, 4, 6);
     ctx.fillRect(156, y, 4, 6);
   });
-  tex.refresh();
 }
 
-// Las barras blancas del umbral de la pista (las "teclas de piano" que marcan donde empieza)
+// Dibujo las barras blancas del umbral de la pista (las "teclas de piano" que marcan donde empieza)
 export function crearUmbral(escena, x, y, ancho, barras = 8) {
   const g = escena.add.graphics();
   const paso = ancho / barras;
@@ -39,7 +43,7 @@ export function crearUmbral(escena, x, y, ancho, barras = 8) {
   return g.setPosition(x, y);
 }
 
-// La plataforma de concreto donde están la torre y el hangar
+// Dibujo la plataforma de concreto donde van la torre y el hangar
 export function crearPlataforma(escena, x, y, ancho, alto) {
   const g = escena.add.graphics();
   g.fillStyle(0xb9b3a2, 1).fillRect(-ancho / 2, -alto / 2, ancho, alto);
@@ -50,7 +54,7 @@ export function crearPlataforma(escena, x, y, ancho, alto) {
   return g.setPosition(x, y);
 }
 
-// La torre de control vista desde arriba: el techo, la cabina de vidrio con su cruz, una antena y la baliza roja que parpadea
+// La torre de control vista desde arriba: dibujo el techo, la cabina de vidrio con su cruz, una antena y la baliza roja que parpadea
 export function crearTorre(escena, x, y) {
   const g = escena.add.graphics();
   g.fillStyle(0x000000, 0.28).fillRect(-26, -20, 84, 84); // sombra del edificio
@@ -70,7 +74,7 @@ export function crearTorre(escena, x, y) {
   return escena.add.container(x, y, [g, resplandor, baliza]);
 }
 
-// El hangar: techo a dos aguas de chapa con nervaduras y el portón que mira a la pista
+// El hangar: dibujo un techo a dos aguas de chapa con nervaduras y el portón que mira a la pista
 export function crearHangar(escena, x, y, ancho = 200, alto = 110) {
   const g = escena.add.graphics();
   g.fillStyle(0x000000, 0.28).fillRect(-ancho / 2 + 14, -alto / 2 + 20, ancho, alto);
@@ -84,7 +88,7 @@ export function crearHangar(escena, x, y, ancho = 200, alto = 110) {
   return g.setPosition(x, y);
 }
 
-// La manga de viento: cuatro tramos naranjas y blancos que se mecen
+// La manga de viento: la armo con cuatro tramos naranjas y blancos y la hago mecer
 export function crearMangaDeViento(escena, x, y) {
   const g = escena.add.graphics();
   const mitades = [8, 6.5, 5, 3.5, 2];
@@ -95,5 +99,5 @@ export function crearMangaDeViento(escena, x, y) {
   const manga = escena.add.container(0, 0, [g]).setAngle(80);
   escena.tweens.add({ targets: manga, angle: 100, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
   const poste = escena.add.circle(0, 0, 5, 0x555555);
-  return escena.add.container(x, y, [manga, poste]); // en (x, y), así se puede escalar sin que se corra
+  return escena.add.container(x, y, [manga, poste]); // la dejo en (x, y), así la puedo escalar sin que se corra
 }

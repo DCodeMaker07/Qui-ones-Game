@@ -30,11 +30,12 @@ function nuevoPlano(escena) {
   const cont = escena.add.container(0, 0).setDepth(10).setAlpha(0);
   const capas = Object.fromEntries(CAPAS.map((nombre) => [nombre, escena.add.container(0, 0)]));
   cont.add(Object.values(capas));
-  return { cont, capas, temporizadores: [] };
+  return { cont, capas, temporizadores: [], limpiezas: [] }; // limpiezas: funciones que ejecuto al quitar el plano (por ejemplo cerrar el 3D)
 }
 
 export function limpiar(escena, plano) {
   plano.temporizadores.forEach((t) => t.remove());
+  plano.limpiezas.forEach((limpieza) => limpieza());
   const matarTweens = (contenedor) =>
     contenedor.list?.forEach((hijo) => {
       escena.tweens.killTweensOf(hijo);
@@ -279,20 +280,28 @@ export function asedio(escena, d) {
 
 // ---------- créditos ----------
 
-// Pares "ROL / nombre" apilados a la izquierda sobre un panel oscuro inclinado. A la derecha puede ir un retrato con marco dorado
+// Armo un panel de información (los créditos) que entra por un costado, se queda y sale por el mismo costado. No le pongo fondo propio:
+// va por encima de los planos de la simulación, que siguen corriendo atrás. d.lado es 'izq' o 'der' y voy alternando los paneles
 export function creditos(escena, d) {
   const plano = nuevoPlano(escena);
-  fondoTerreno(escena, plano, { terreno: d.terreno ?? 'terreno_2', dur: d.dur, velocidad: 50, angulo: 12, oscuro: 0.3 });
+  plano.cont.setDepth(12); // por encima de los planos de la simulación (que están en 10)
+  const der = d.lado === 'der';
+  const sentido = der ? 1 : -1; // de qué lado viene y hacia cuál se va
+  const x = der ? 1280 - 110 : 110;
+  const objetos = [];
 
   const panel = escena.add.graphics();
   paralelogramo(panel, -160, 0, 900, 720, 110, 0x000000, 0.64);
+  if (der) panel.setPosition(1280, 0).setScale(-1, 1); // el mismo panel, espejado
   plano.capas.suelo.add(panel);
-  deslizar(escena, panel, { dx: -500, dur: 500 });
+  deslizar(escena, panel, { dx: sentido * 500, dur: 320 });
+  objetos.push([panel, 500]);
 
   // Primero creo los textos para medir cuánto ocupan y después los centro verticalmente
+  const alinear = (texto) => texto.setOrigin(der ? 1 : 0, 0);
   const bloques = d.lineas.map(([rol, nombre]) => ({
-    rol: escena.add.text(110, 0, rol.toUpperCase(), estiloHud(22, { color: TXT.dorado, fontStyle: 'bold', letterSpacing: 5 })),
-    nombre: escena.add.text(110, 0, nombre, estiloHud(nombre.length > 22 ? 36 : 52, { wordWrap: { width: 640 } })),
+    rol: alinear(escena.add.text(x, 0, rol.toUpperCase(), estiloHud(22, { color: TXT.dorado, fontStyle: 'bold', letterSpacing: 5, align: der ? 'right' : 'left' }))),
+    nombre: alinear(escena.add.text(x, 0, nombre, estiloHud(nombre.length > 22 ? 36 : 52, { wordWrap: { width: 640 }, align: der ? 'right' : 'left' }))),
   }));
   const separacion = 38;
   const total = bloques.reduce((suma, b) => suma + b.rol.height + b.nombre.height + separacion, -separacion);
@@ -302,18 +311,15 @@ export function creditos(escena, d) {
     b.nombre.setY(y + b.rol.height + 4);
     y += b.rol.height + b.nombre.height + separacion;
     plano.capas.texto.add([b.rol, b.nombre]);
-    deslizar(escena, b.rol, { dx: -300, delay: 250 + i * 260 });
-    deslizar(escena, b.nombre, { dx: -300, delay: 340 + i * 260 });
+    deslizar(escena, b.rol, { dx: sentido * 260, dur: 300, delay: 120 + i * 140 }); // entran rápido: pocos segundos por plano
+    deslizar(escena, b.nombre, { dx: sentido * 260, dur: 300, delay: 190 + i * 140 });
+    objetos.push([b.rol, 300], [b.nombre, 300]);
   });
 
-  if (d.retrato) {
-    const sombra = escena.add.rectangle(10, 10, 350, 460, 0x000000, 0.45);
-    const borde = escena.add.rectangle(0, 0, 350, 460, COLOR.dorado);
-    const foto = escena.add.image(0, 0, d.retrato).setDisplaySize(330, 440);
-    const tarjeta = escena.add.container(1000, 360, [sombra, borde, foto]).setAngle(3);
-    plano.capas.texto.add(tarjeta);
-    deslizar(escena, tarjeta, { dx: 700, dur: 650, delay: 200, ease: 'Back.easeOut' });
-  }
+  // La salida: medio segundo antes de que termine el plano, todo vuelve a irse por el mismo costado
+  programar(escena, plano, d.dur - 0.5, () =>
+    objetos.forEach(([objeto, recorrido]) => escena.tweens.add({ targets: objeto, x: objeto.x + sentido * recorrido, alpha: 0, duration: 340, ease: 'Cubic.easeIn' }))
+  );
   return plano;
 }
 
@@ -323,15 +329,21 @@ export function creditos(escena, d) {
 export function marcha(escena, d) {
   const plano = nuevoPlano(escena);
   fondoTerreno(escena, plano, { terreno: d.terreno ?? 'terreno_3', dur: d.dur, velocidad: 160, oscuro: 0.15 });
-  [450, 640, 830].forEach((x, c) => {
-    for (let fila = 0; fila < 4; fila++) {
-      const y0 = 800 + fila * 110 + (c === 1 ? -50 : 0); // la columna del medio va un poco adelante
-      const soldado = escena.add.sprite(x, y0, 'soldado_aliado_arriba').setScale(ESCALA.soldado);
-      soldado.play('aliado_arriba');
-      plano.capas.suelo.add(soldado);
-      escena.tweens.add({ targets: soldado, y: y0 - 1300, duration: d.dur * 1000 + 800, ease: 'Sine.easeIn' }); // arrancan al paso y aceleran
-    }
-  });
+  // Si el plano dura mucho, mando varias oleadas de columnas una detrás de otra (cada una tarda unos 5,5 s en cruzar la pantalla),
+  // así nunca queda el terreno vacío
+  const oleadas = Math.max(1, Math.round(d.dur / 5.5));
+  const espacio = d.dur / oleadas;
+  for (let k = 0; k < oleadas; k++) {
+    [450, 640, 830].forEach((x, c) => {
+      for (let fila = 0; fila < 4; fila++) {
+        const y0 = 800 + fila * 110 + (c === 1 ? -50 : 0); // la columna del medio va un poco adelante
+        const soldado = escena.add.sprite(x, y0, 'soldado_aliado_arriba').setScale(ESCALA.soldado);
+        soldado.play('aliado_arriba');
+        plano.capas.suelo.add(soldado);
+        escena.tweens.add({ targets: soldado, y: y0 - 1300, duration: espacio * 1000 + 800, delay: k * espacio * 1000, ease: 'Sine.easeIn' }); // arrancan al paso y aceleran
+      }
+    });
+  }
   return plano;
 }
 
@@ -363,12 +375,9 @@ export function titulo(escena, d) {
   return plano;
 }
 
-// ---------- el cierre ----------
-
-// El avión aterriza al atardecer sobre una pista que cruza el primer terreno del juego (el de Zarumilla). Va bajando: se
-// achica y su sombra se pega a él hasta tocar la pista, levanta polvo y frena. Cuando vuelve la música aparece "FIN".
-export function cierre(escena, d) {
-  const plano = nuevoPlano(escena);
+// Armo la versión en 2D del fondo del cierre: el terreno y la pista desde arriba, de atardecer. Como Quiñones estrella su avión, ya no
+// aterriza: en el final histórico su avión (en gris) se va subiendo y desvaneciendo, y en el alternativo la pista queda sin avión
+function fondoCierre2D(escena, plano, d, historico) {
   const { width, height } = escena.scale;
   const toque = d.toqueEn; // segundo en que las ruedas tocan la pista
   const frenado = d.finEn + 1.5 - toque; // cuánto tarda en detenerse
@@ -387,39 +396,58 @@ export function cierre(escena, d) {
   const brillo = escena.add.image(width / 2, 90, 'ending_chispa').setScale(22).setBlendMode(Phaser.BlendModes.ADD).setAlpha(0.4);
   plano.capas.fondo.add([terreno, pista, atardecer, cielo, brillo]);
 
-  // El avión: la altura va de 1 (en el aire) a 0 (en el suelo). Con la altura cambian su tamaño y la distancia de su sombra
-  const base = ESCALA.avion;
-  const x = width / 2;
-  const y = 470;
-  const sombra = escena.add.sprite(x, y, 'avion_jugador').setTint(0x000000).setAlpha(0.3);
-  const avion = escena.add.sprite(x, y, 'avion_jugador');
-  if (escena.registry.get('finalMalo')) aGris(avion);
-  [sombra, avion].forEach((s) => s.play('nave_vuelo'));
-  plano.capas.sombras.add(sombra);
+  if (!historico) return;
+  const avion = escena.add.sprite(width / 2, 470, 'avion_jugador').setScale(ESCALA.avion);
+  aGris(avion);
+  avion.play('nave_vuelo');
   plano.capas.aire.add(avion);
-  const poner = (altura) => {
-    const escala = base * (1 + 0.6 * altura);
-    avion.setScale(escala);
-    sombra.setScale(escala * 1.02).setPosition(x + SOMBRA.x * base * 3 * altura, y + SOMBRA.y * base * 3 * altura);
-  };
-  const altura = { v: 1 };
-  poner(1);
-  escena.tweens.add({ targets: altura, v: 0, duration: toque * 1000, ease: 'Sine.easeIn', onUpdate: () => poner(altura.v) });
+  escena.tweens.add({ targets: avion, y: -120, scale: ESCALA.avion * 0.5, alpha: 0, duration: toque * 1000, ease: 'Sine.easeIn' });
+}
 
-  // Al tocar la pista las dos ruedas levantan polvo y la cámara tiembla un poco
-  programar(escena, plano, toque, () => {
-    escena.cameras.main.shake(220, 0.005);
-    [-1, 1].forEach((lado) => {
-      for (let i = 0; i < 6; i++) {
-        const polvo = escena.add.circle(x + lado * 40, y + 45, Phaser.Math.Between(8, 14), 0xe8d8b0, 0.65);
-        plano.capas.efectos.add(polvo);
-        escena.tweens.add({ targets: polvo, x: polvo.x + lado * Phaser.Math.Between(10, 60), y: polvo.y + Phaser.Math.Between(80, 220), scale: 3, alpha: 0, duration: 1100, delay: i * 70, onComplete: () => polvo.destroy() });
-      }
-    });
-  });
+// Armo la versión en 3D (sistemas/three/CierreTresD.js): de noche, con las luces de la pista encendidas. Según el final es la pista vacía
+// con el avión fantasma yéndose a las estrellas, o Quiñones llegando a pie. La hago correr con el update de la escena y la limpio
+// junto con el plano
+function fondoCierre3D(escena, plano, d, historico) {
+  const { width, height } = escena.scale;
+  const tres = new escena.CierreTresD(escena, d, historico);
+  plano.capas.fondo.add(escena.add.image(width / 2, height / 2, tres.clave).setDisplaySize(width, height));
+  let tiempo = 0;
+  const alActualizar = (_, delta) => {
+    tiempo += delta / 1000;
+    tres.actualizar(tiempo, delta / 1000);
+  };
+  escena.events.on('update', alActualizar);
+  const limpiarTres = () => {
+    escena.events.off('update', alActualizar);
+    tres.destruir();
+  };
+  plano.limpiezas.push(limpiarTres);
+  escena.events.once('shutdown', limpiarTres);
+}
+
+// ---------- el cierre ----------
+
+// El avión aterriza al atardecer sobre una pista que cruza el primer terreno del juego (el de Zarumilla). Va bajando: se
+// achica y su sombra se pega a él hasta tocar la pista, levanta polvo y frena. Cuando vuelve la música aparece "FIN".
+export function cierre(escena, d) {
+  const plano = nuevoPlano(escena);
+  const { width, height } = escena.scale;
+
+  // El fondo y lo que pasa en él: en 3D si pude cargar Three.js (lo precarga EndingScene) y, si no se puede, en 2D
+  const historico = !!escena.registry.get('finalMalo'); // si el final fue el histórico, Quiñones murió
+  let hecho = false;
+  if (escena.CierreTresD) {
+    try {
+      fondoCierre3D(escena, plano, d, historico);
+      hecho = true;
+    } catch (error) {
+      console.warn('No pude armar el cierre en 3D, uso el 2D:', error);
+    }
+  }
+  if (!hecho) fondoCierre2D(escena, plano, d, historico);
 
   const dedicatoria = [
-    escena.add.text(width / 2, 110, 'EN MEMORIA DE', estiloHud(22, { color: TXT.dorado, fontStyle: 'bold', letterSpacing: 8 })).setOrigin(0.5),
+    escena.add.text(width / 2, 110, historico ? 'EN MEMORIA DE' : 'EN HOMENAJE A', estiloHud(22, { color: TXT.dorado, fontStyle: 'bold', letterSpacing: 8 })).setOrigin(0.5),
     escena.add.text(width / 2, 168, 'José Abelardo Quiñones Gonzales', estiloHud(50)).setOrigin(0.5),
     escena.add.text(width / 2, 228, '23 DE JULIO DE 1941', estiloHud(26, { fontStyle: 'bold', letterSpacing: 6 })).setOrigin(0.5),
   ];

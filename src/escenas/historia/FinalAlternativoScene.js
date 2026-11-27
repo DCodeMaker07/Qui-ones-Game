@@ -3,9 +3,8 @@ import { FUENTE, FUENTE_TITULO, px } from '../../config.js';
 import { ambiente } from '../../sistemas/efectos/Ambiente.js';
 import { crearBaseEnLlamas } from '../../sistemas/efectos/BaseEnLlamas.js';
 
-// FINAL ALTERNATIVO (no histórico): tras la picada, Quiñones se lanza en paracaídas y cae junto al río.
-// Se desbloquea si el jugador pierde pocos soldados en el Nivel 3 (ver Level3Scene). Lleva siempre un cartel que dice que
-// NO ocurrió así, y después un epílogo y el tributo cuentan lo que sucedió en realidad.
+// FINAL ALTERNATIVO: tras la picada, Quiñones se lanza en paracaídas y cae junto al río.
+// Se desbloquea si el puntaje llega a PUNTAJE_FINAL_BUENO (ver Picada). Después viene un epílogo del narrador (epilogo_alt) y el ending.
 // Arte opcional: assets/sprites/aviones/paracaidas.png (si no existe se dibuja un paracaídas visto desde arriba).
 export default class FinalAlternativoScene extends Phaser.Scene {
   constructor() {
@@ -24,10 +23,9 @@ export default class FinalAlternativoScene extends Phaser.Scene {
     const by = height * 0.5;
     crearBaseEnLlamas(this, bx, by, 1.45, 2);
 
-    // Cartel permanente: no es la historia real
+    // El cartel de arriba, con el nombre del final
     this.add.rectangle(0, 0, width, 78, 0x000000, 0.65).setOrigin(0).setDepth(20);
     this.add.text(width / 2, 24, 'FINAL ALTERNATIVO', { fontFamily: FUENTE_TITULO, fontStyle: 'bold', fontSize: '34px', color: '#ffd35a', stroke: '#000', strokeThickness: 4 }).setOrigin(0.5).setDepth(21);
-    this.add.text(width / 2, 58, 'Esto NO ocurrió así: es un final inventado por el juego', { fontFamily: FUENTE, fontSize: px(9), color: '#ffffff' }).setOrigin(0.5).setDepth(21);
 
     // Paracaídas: baja con vaivén y aterriza en la orilla del río
     const destino = { x: width * 0.78, y: height * 0.6 };
