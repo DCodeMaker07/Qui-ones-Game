@@ -120,11 +120,17 @@ export const ESCENAS = {
     fondo: 'terreno_3',
     personajes: ['quinones'],
     dramatizada: false,
+    musica: 'musica_final', // suena hasta el final de esta escena
     dialogo: [
-      { quien: null, texto: 'Ese final alternativo es una invención del juego: no ocurrió así.' },
-      { quien: null, texto: 'La historia real fue otra.' },
+      { quien: null, texto: 'Quiñones se lanzó en picada contra la posición enemiga y su avión destruyó la base.' },
+      { quien: null, texto: 'Antes del impacto alcanzó a saltar en paracaídas y cayó a salvo, cerca del río.' },
+      { quien: null, texto: 'Sus soldados lo encontraron enseguida y la misión se dio por cumplida.' },
+      { quien: null, texto: 'En su honor, cada 23 de julio se celebra el Día de la Fuerza Aérea del Perú.' },
     ],
-    siguiente: { escena: 'CutsceneScene', data: { id: 'tributo' } },
+    siguiente: { escena: 'EndingScene', data: { victoria: true } },
+    // Multijugador: el narrador se ve y se oye en los dos dispositivos a la vez (el piloto es el líder) y el ending empieza en los dos al mismo tiempo
+    compartida: true,
+    siguienteMulti: { sync: 'ending', escena: 'EndingScene', data: { victoria: true } },
   },
 
   // Tributo: solo narrador, sin frases inventadas para Quiñones.
@@ -139,7 +145,9 @@ export const ESCENAS = {
       { quien: null, texto: 'Su avión fue alcanzado por fuego enemigo y lo dirigió contra la posición antiaérea, entregando su vida.' },
       { quien: null, texto: 'En su honor, cada 23 de julio se celebra el Día de la Fuerza Aérea del Perú.' },
     ],
-    siguiente: { escena: 'EndingScene', data: { victoria: true } }, // victoria: true para que Layla vea que la misión terminó
+    siguiente: { escena: 'EndingScene', data: { victoria: true } },
+    compartida: true,
+    siguienteMulti: { sync: 'ending', escena: 'EndingScene', data: { victoria: true } },
   },
 };
 

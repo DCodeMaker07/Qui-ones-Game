@@ -5,6 +5,8 @@ import { VoiceSystem } from './sistemas/audio/VoiceSystem.js';
 import { Red } from './red/Red.js';
 import { ambiente } from './sistemas/efectos/Ambiente.js';
 import { crearMasterMenu } from './sistemas/herramientas/MasterMenu.js';
+import { iniciarMando } from './sistemas/entrada/Mando.js';
+import { iniciarEspejoFinal } from './red/espejoFinal.js';
 import BootScene from './escenas/arranque/BootScene.js';
 import PreloadScene from './escenas/arranque/PreloadScene.js';
 import IntroScene from './escenas/arranque/IntroScene.js';
@@ -42,6 +44,10 @@ const game = new Phaser.Game({
 game.voice = new VoiceSystem();
 // Cliente del modo multijugador compartido por todas las escenas: this.game.red
 game.red = new Red();
+iniciarEspejoFinal(game); // Layla ve las escenas finales a la vez que el piloto
+
+// El mando: aprieta las mismas teclas que ya usa el juego (ver sistemas/entrada/Mando.js)
+iniciarMando(game);
 
 // Solo en desarrollo: acceso al juego desde la consola del navegador (window.__juego).
 if (import.meta.env.DEV) window.__juego = game;

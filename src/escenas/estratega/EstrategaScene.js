@@ -86,7 +86,6 @@ export default class EstrategaScene extends Phaser.Scene {
     this.registroRadio = [];
     this.pideRefuerzos = false;
     this.escenaPiloto = null;
-    this.escuchandoVoz = false;
     this.pausa = false; // el piloto pausó la partida
     this.derribado = false; // el piloto perdió y está en la pantalla de derrota (puede reintentar)
     this.picada = false; // el piloto se lanzó en picada: final del Nivel 3
@@ -132,7 +131,14 @@ export default class EstrategaScene extends Phaser.Scene {
     // Mapa: clics
     this.input.mouse?.disableContextMenu();
     this.input.on('pointerdown', (p) => this.alClicMapa(p));
-    this.input.keyboard.on('keydown-SPACE', () => this.hablar());
+
+    // Barrera: una vista previa que sigue al mouse y se gira con la rueda (o con las teclas Q y E, de 15 en 15 grados) antes de colocarla
+    this.anguloBarrera = 0;
+    this.fantasma = this.add.image(0, 0, this.textures.exists('barrera_aliada') ? 'barrera_aliada' : 'botiquin_suelo').setScale(0.27 * K).setAlpha(0.65).setDepth(9).setVisible(false);
+    this.txtAngulo = this.add.text(0, 0, '', { fontFamily: FUENTE_UI, fontStyle: 'bold', fontSize: '12px', color: '#ffd27a', stroke: '#000', strokeThickness: 3 }).setOrigin(0.5).setDepth(9).setVisible(false);
+    this.input.on('wheel', (p, _objetos, _dx, dy) => this.herramienta === 'barrera' && this.dentroDelMapa(p.x, p.y) && this.girarBarrera(dy > 0 ? 15 : -15));
+    this.input.keyboard.on('keydown-Q', () => this.herramienta === 'barrera' && this.girarBarrera(-15));
+    this.input.keyboard.on('keydown-E', () => this.herramienta === 'barrera' && this.girarBarrera(15));
 
     // Red
     const ev = this.red.ev;
@@ -157,11 +163,12 @@ export default class EstrategaScene extends Phaser.Scene {
       Object.entries(this.escuchas).forEach(([t, fn]) => ev.off(t, fn));
       this.entrada.remove();
       detenerPista(this, 'musica_dialogo', 600);
-      this.game.voice?.cancelarEscucha();
       window.speechSynthesis?.cancel();
     });
     this.actualizarEspera();
     this.seleccionarHerramienta('marca-bomba');
+    // Si vengo del ending (Layla no ve la línea de tiempo de juegos): la torre queda con el cartel de misión terminada
+    if (this.registry.get('misionTerminada')) this.time.delayedCall(500, () => this.mostrarFin());
   }
 
   // ---------- panel de la torre (consola) ----------
@@ -302,7 +309,6 @@ export default class EstrategaScene extends Phaser.Scene {
       .text(P.x + 26, P.y + 380, '', { fontFamily: FUENTE_UI, fontSize: '13px', color: '#ffd27a', lineSpacing: 3, wordWrap: { width: P.w - 52 } })
       .setDepth(6)
       .setShadow(0, 0, '#ffb000', 5, false, true);
-    this.botonVoz = this.boton(P.x + 14, P.y + 482, 150, 34, 'Hablar (ESPACIO)', () => this.hablar());
   }
 
   // Barra de kilómetros hecha de segmentos luminosos (verdes, y ámbar al final)
@@ -346,7 +352,7 @@ export default class EstrategaScene extends Phaser.Scene {
   }
 
   crearEntradaTexto() {
-    // Campo para escribir mensajes de radio (alternativa a hablar). Posición en %: se escala con el juego.
+    // Campo para escribir mensajes de radio. Layla no usa micrófono: solo escribe (y da clic en el mapa y los botones). Posición en %: se escala con el juego.
     this.entrada = document.createElement('input');
     this.entrada.type = 'text';
     this.entrada.maxLength = 140;
@@ -421,6 +427,7 @@ export default class EstrategaScene extends Phaser.Scene {
     this.sincronizar('a', s.a, () => this.fichaSprite('soldado_aliado_arriba', 0.3, 0, false));
     this.sincronizar('b', s.b, () => this.fichaSprite('botiquin_suelo', 0.14, 0, false));
     this.sincronizar('r', s.r ?? [], () => this.fichaSprite(this.textures.exists('barrera_aliada') ? 'barrera_aliada' : 'botiquin_suelo', 0.27, 0, false)); // las barreras de los aliados
+    this.fichas.r.forEach((f) => f.cont.list[0].setAngle(f.datos[4] ?? 0)); // cada barrera con su ángulo
     this.sincronizar('m', s.m, (f) => this.fichaMarca(f));
     this.fuegos = (s.fu ?? []).map(([x, y]) => ({ x, y }));
 
@@ -549,6 +556,11 @@ export default class EstrategaScene extends Phaser.Scene {
         g.lineStyle(3, 0xffb000, 1).strokeCircle(p.x, p.y, 24 * K);
       }
     }
+    // La vista previa de la barrera sigue al mouse dentro del mapa, con el ángulo que tiene ahora
+    const mouse = this.input.activePointer;
+    const verFantasma = this.herramienta === 'barrera' && !this.cartel && this.dentroDelMapa(mouse.x, mouse.y);
+    this.fantasma.setVisible(verFantasma).setPosition(mouse.x, mouse.y).setAngle(this.anguloBarrera);
+    this.txtAngulo.setVisible(verFantasma).setPosition(mouse.x, mouse.y - 22).setText(`${this.anguloBarrera}°`);
     // Aviso de "sin señal" si el piloto dejó de enviar datos
     if (this.estado && this.time.now - this.tUltimo > 2500) this.actualizarEspera();
   }
@@ -617,7 +629,7 @@ export default class EstrategaScene extends Phaser.Scene {
         'marca-peligro': 'Herramienta: marca PELIGRO. Clic en el mapa',
         'marca-aliados': 'Herramienta: marca ALIADOS AQUÍ. Clic en el mapa',
         botiquin: 'Botiquín: haz clic en el mapa donde quieres que caiga (dentro de la pantalla del piloto)',
-        barrera: 'Barrera: haz clic en el mapa donde la quieres. Frena las balas de las torretas y de los soldados enemigos',
+        barrera: 'Barrera: gírala con la rueda del mouse (o Q y E) y haz clic donde la quieres. Frena las balas de las torretas y de los soldados enemigos',
         atacar: 'Atacar: haz clic en un nido o en la base para que los soldados vayan a atacarlo',
       }[h]
     );
@@ -649,11 +661,15 @@ export default class EstrategaScene extends Phaser.Scene {
     }
     if (this.herramienta === 'barrera') {
       if (wy < 0 || wy > GAME.height) return this.agregarRadio('sistema', 'La barrera debe quedar dentro de la pantalla del piloto.');
-      this.red.enviar({ t: 'barrera', x: wx, y: wy });
+      this.red.enviar({ t: 'barrera', x: wx, y: wy, a: this.anguloBarrera });
       this.agregarRadio('sistema', 'Barrera colocada.');
       return this.seleccionarHerramienta('marca-bomba');
     }
     this.red.enviar({ t: 'marca', tipo: this.herramienta.replace('marca-', ''), x: wx, y: wy });
+  }
+
+  girarBarrera(grados) {
+    this.anguloBarrera = (this.anguloBarrera + grados + 360) % 360;
   }
 
   enviarOrden(tipo) {
@@ -668,30 +684,6 @@ export default class EstrategaScene extends Phaser.Scene {
   }
 
   // ---------- radio ----------
-
-  hablar() {
-    if (this.pausa) return;
-    const voz = this.game.voice;
-    if (!voz?.soportado) return this.agregarRadio('sistema', 'Tu navegador no soporta voz. Escribe el mensaje.');
-    if (this.escuchandoVoz) return;
-    this.escuchandoVoz = true;
-    this.botonVoz.activo = true;
-    this.botonVoz.txt.setText('Escuchando…');
-    this.botonVoz.pintar();
-    const terminar = () => {
-      this.escuchandoVoz = false;
-      this.botonVoz.activo = false;
-      this.botonVoz.txt.setText('Hablar (ESPACIO)');
-      this.botonVoz.pintar();
-    };
-    voz.escuchar({
-      onTexto: (t) => this.enviarRadio(t),
-      onError: (m) => this.agregarRadio('sistema', m),
-      onFin: terminar,
-    });
-    // Por si el navegador no avisa el final
-    this.time.delayedCall(12000, terminar);
-  }
 
   // Layla envía el mensaje: el piloto lo oye con voz de mujer (síntesis), sea quien sea quien lo diga
   enviarRadio(texto) {

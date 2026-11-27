@@ -55,9 +55,11 @@ export default class CutsceneScene extends Phaser.Scene {
     this.id = ESCENAS[data.id] ? data.id : 'palacio';
     this.def = ESCENAS[this.id];
     this.musica = this.def.musica ?? MUSICA; // algunas escenas (el tributo) traen su propia música
-    // El jugador lee en voz alta las líneas de SU personaje: Quiñones (piloto o un jugador) o Layla (estratega)
+    // Solo Quiñones (el piloto, o el único jugador) usa el micrófono: lee en voz alta las líneas de su personaje. El segundo jugador (Layla, la
+    // estratega) no usa micrófono: sus líneas salen con voz sintetizada y las avanza con un clic (o ESPACIO)
     this.multi = this.registry.get('multi') === true && !!this.game.red?.activa;
     this.idJugador = this.multi && this.registry.get('rol') === 'estratega' ? 'layla' : 'quinones';
+    this.soloClic = this.idJugador === 'layla'; // Layla solo da clic para avanzar: nada se salta solo
     // Escena compartida (multijugador): ambos jugadores en la misma escena, turnándose las líneas. El piloto es el
     // líder: decide cuándo se pasa a la siguiente línea y se lo avisa a Layla (mensaje "dialogo").
     this.compartida = this.multi && !!this.def.compartida && !!this.game.red.companero;
@@ -147,7 +149,7 @@ export default class CutsceneScene extends Phaser.Scene {
     this.kLuz = this.add.text(x0 + 30, yTexto, '', { ...estiloK, color: '#ffffff' }).setVisible(false);
 
     this.pista = this.add
-      .text(x0 + bw - 30, height - 48, 'ESPACIO >', { fontFamily: FUENTE, fontSize: px(10), color: '#ffc83d' })
+      .text(x0 + bw - 30, height - 48, 'CLIC / ESPACIO >', { fontFamily: FUENTE, fontSize: px(10), color: '#ffc83d' })
       .setOrigin(1, 0.5);
     this.tweens.add({ targets: this.pista, alpha: 0.2, duration: 500, yoyo: true, repeat: -1 });
     if (def.dramatizada) {
@@ -205,18 +207,35 @@ export default class CutsceneScene extends Phaser.Scene {
       this.limpiarLinea();
       this.finalizarEscena();
     } else if (m.a === 'fin') {
-      // El otro jugador terminó de decir su línea: se oye con voz sintetizada (Layla: voz de mujer). Al terminar, el
-      // líder avanza solo (revisarFin); la seguidora espera la siguiente línea del líder.
+      // El otro jugador dijo su línea. Se oye con voz sintetizada (Layla: voz de mujer) AL MISMO TIEMPO que en el dispositivo de quien la dijo:
+      // quien habla manda este aviso justo cuando empieza a repetirla, no cuando termina. Cuando la oyó entera, le avisa al líder ("listo")
       const linea = this.def.dialogo[this.i];
       if (m.i !== this.i || !linea || linea.quien === this.idJugador || this.finRecibido === this.i) return;
       this.finRecibido = this.i;
       const token = this.token;
+      if (this.lider) {
+        // El líder ya oyó la línea de Layla cuando empezó (la dijo su propia voz sintetizada): este aviso es el clic con el que ella pasa de línea
+        this.revisarFin(token);
+        return;
+      }
       const texto = String(m.texto || linea.texto).slice(0, 200);
+      const alTerminar = () => {
+        this.finVoz(token);
+        this.game.red.enviar({ t: 'dialogo', a: 'listo', id: this.id, i: this.i });
+      };
       this.conVoz = true;
       this.vozActiva = true;
       this.boca(true);
-      if (this.game.voice?.soportado) this.game.voice.hablar(texto, () => this.finVoz(token), PERSONAJES[linea.quien]?.genero ?? 'H');
-      else this.time.delayedCall(1200, () => this.finVoz(token));
+      if (this.game.voice?.soportado) this.game.voice.hablar(texto, alTerminar, PERSONAJES[linea.quien]?.genero ?? 'H');
+      else this.time.delayedCall(1200, alTerminar);
+    } else if (m.a === 'listo' && this.lider) {
+      // El otro ya oyó mi línea completa: ahora sí puedo pasar a la siguiente
+      this.listoRecibido = m.i;
+      if (this.esperandoListo === this.token && m.i === this.i) {
+        this.autoTimer?.remove();
+        const token = this.token;
+        this.autoTimer = this.time.delayedCall(VOCES.pausaMs, () => this.siguiente(token));
+      }
     }
   }
 
@@ -233,6 +252,7 @@ export default class CutsceneScene extends Phaser.Scene {
   mostrar() {
     this.limpiarLinea();
     const token = ++this.token;
+    this.esperandoListo = null;
     const linea = this.def.dialogo[this.i];
     if (this.compartida && this.lider) this.game.red.enviar({ t: 'dialogo', a: 'linea', id: this.id, i: this.i });
     const p = linea.quien ? PERSONAJES[linea.quien] : null;
@@ -250,13 +270,13 @@ export default class CutsceneScene extends Phaser.Scene {
     });
     this.nombre.setText(p ? p.nombre : 'NARRADOR').setColor(p ? p.color : '#cccccc');
     this.estado.setText('');
-    this.pista.setText('ESPACIO >');
+    this.pista.setText('CLIC / ESPACIO >');
     this.texto.setText('').setVisible(true);
     this.kBase.setVisible(false);
     this.kLuz.setVisible(false);
 
-    // Línea de Quiñones: la lee el jugador (karaoke)
-    if (linea.quien === this.idJugador && VOCES.jugadorLeeAQuinones && this.game.voice?.soportado) {
+    // Línea de Quiñones: la lee el jugador (karaoke). Layla no, porque ella no usa micrófono
+    if (linea.quien === this.idJugador && this.idJugador === 'quinones' && VOCES.jugadorLeeAQuinones && this.game.voice?.soportado) {
       this.texto.setVisible(false);
       this.nombre.setText(`${p.nombre} (TÚ)`);
       this.pista.setText('DI LA FRASE PARA CONTINUAR');
@@ -269,7 +289,19 @@ export default class CutsceneScene extends Phaser.Scene {
     // Escena compartida: la línea es del OTRO jugador. Se ve su texto y se espera a que la diga (llega su aviso 'fin')
     if (this.compartida && (linea.quien === 'quinones' || linea.quien === 'layla') && linea.quien !== this.idJugador) {
       volumenPista(this, this.musica, FACTOR_MUSICA, 400);
-      this.pista.setText('ESPERANDO AL OTRO JUGADOR…');
+      if (this.lider) {
+        // La línea es de Layla. Su dispositivo la empieza a la vez que este (le llegó el aviso "linea"), así que la oigo con voz de mujer desde ya y
+        // no cuando ella termine. Después espero a que ella haga clic para pasar de línea
+        this.pista.setText('ESPERANDO A LAYLA…');
+        if (VOCES.respaldoTTS && this.game.voice?.soportado) {
+          this.conVoz = true;
+          this.vozActiva = true;
+          this.boca(true);
+          this.game.voice.hablar(linea.texto, () => this.finVoz(token), PERSONAJES[linea.quien]?.genero ?? 'M');
+        }
+      } else {
+        this.pista.setText('ESPERANDO AL OTRO JUGADOR…'); // la seguidora la oye cuando el piloto empieza a repetir su frase (aviso "fin")
+      }
       this.escribir(linea.texto, 28, token);
       return;
     }
@@ -323,10 +355,22 @@ export default class CutsceneScene extends Phaser.Scene {
   // Cuando ya no hay texto escribiéndose, voz sonando ni micrófono abierto, la línea terminó.
   revisarFin(token) {
     if (token !== this.token || this.escribiendo || this.vozActiva || this.escuchando) return;
+    const linea = this.def.dialogo[this.i];
+    const deLayla = this.compartida && this.lider && linea?.quien === 'layla'; // línea de Layla vista desde el piloto
+    if (deLayla && this.finRecibido !== this.i) return; // falta que Layla haga clic para pasar de línea
     this.boca(false);
     this.blip?.stop();
-    if (VOCES.autoAvance && this.conVoz) {
-      this.autoTimer = this.time.delayedCall(VOCES.pausaMs, () => this.siguiente(token));
+    if (deLayla) {
+      this.autoTimer = this.time.delayedCall(VOCES.pausaMs, () => this.siguiente(token)); // ya hizo clic y yo terminé de oírla
+    } else if (VOCES.autoAvance && this.conVoz && !this.soloClic) { // con un clic avanza Layla; al piloto lo avanza la voz
+      // Si la línea es mía y Layla la está oyendo a la vez, espero a que termine de oírla ("listo") antes de pasar a la siguiente
+      const alguienOye = this.compartida && this.lider && linea?.quien === this.idJugador && this.game.red.companero && this.listoRecibido !== this.i;
+      if (alguienOye) {
+        this.esperandoListo = token;
+        this.autoTimer = this.time.delayedCall(6000, () => this.siguiente(token)); // por si el aviso no llega
+      } else {
+        this.autoTimer = this.time.delayedCall(VOCES.pausaMs, () => this.siguiente(token));
+      }
     }
   }
 
@@ -493,7 +537,7 @@ export default class CutsceneScene extends Phaser.Scene {
     this.game.voice.cancelarEscucha();
     this.estado.setText('ENTENDIDO').setColor('#7cfc9a');
     volumenPista(this, this.musica, FACTOR_MUSICA, 500); // el micrófono ya se cerró: vuelve la música
-    this.pista.setText('ESPACIO >');
+    this.pista.setText('CLIC / ESPACIO >');
     this.repetirJugador(dicho, token);
   }
 
@@ -514,6 +558,11 @@ export default class CutsceneScene extends Phaser.Scene {
     this.conVoz = true;
     this.vozActiva = true;
     this.boca(true);
+    // Escena compartida: le aviso al otro jugador ahora (no cuando termine) para que la oiga a la vez que yo
+    if (this.compartida && this.finEnviado !== this.i) {
+      this.finEnviado = this.i;
+      this.game.red.enviar({ t: 'dialogo', a: 'fin', id: this.id, i: this.i, texto: dicho });
+    }
     this.game.voice.hablar(dicho, () => this.finVoz(token), this.idJugador === 'layla' ? 'M' : undefined);
   }
 

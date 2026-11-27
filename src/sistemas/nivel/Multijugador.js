@@ -4,7 +4,7 @@ import { ambiente } from '../efectos/Ambiente.js';
 import { playSfx } from '../audio/audio.js';
 import { FUENTE } from '../../ui/tema.js';
 import { esPedidoRefuerzos } from '../../ui/nivel/Radio.js';
-import { PX_POR_KM, TECLAS } from './constantes.js';
+import { PX_POR_KM, TECLAS, nombreTecla } from './constantes.js';
 
 // Mi lado del modo multijugador. Yo soy el piloto: mi navegador corre todo el juego y le manda una "foto" del campo de batalla
 // a Layla unas 10 veces por segundo. Ella me responde con marcas, órdenes, botiquines, refuerzos y mensajes de radio.
@@ -18,6 +18,7 @@ export default class Multijugador {
     this.red = escena.game.red;
     this.marcas = [];
     this.idMarca = 0;
+    this.ignorarHasta = 0; // las marcas con id hasta este número ya no guían a los soldados (Layla les dio una orden después)
     this.tEnvio = 0;
     this.refuerzosAvisados = false;
     this.grafico = escena.add.graphics().setDepth(5.7);
@@ -47,13 +48,13 @@ export default class Multijugador {
       marca: (m) => this.alMarcaDeLayla(m),
       orden: (m) => this.alOrdenDeLayla(m),
       botiquin: (m) => e.botiquin.pedir({ x: m.x, y: m.y }),
-      barrera: (m) => e.barreras.colocar(Phaser.Math.Clamp(Number(m.x) || 0, 20, e.scale.width - 20), Phaser.Math.Clamp(Number(m.y) || 0, 40, e.scale.height - 40)),
+      barrera: (m) => e.barreras.colocar(Phaser.Math.Clamp(Number(m.x) || 0, 20, e.scale.width - 20), Phaser.Math.Clamp(Number(m.y) || 0, 40, e.scale.height - 40), Phaser.Math.Wrap(Math.round(Number(m.a) || 0), 0, 360)),
       refuerzos: () => e.fase === 'base' && e.baseEnemiga.llamarRefuerzos(false),
       companero: (m) => !m.conectado && e.radio.mostrar('Layla se desconectó: vuelve la asistente automática.', { duracion: 4500 }),
     };
     Object.entries(escuchas).forEach(([tipo, fn]) => ev.on(tipo, fn));
     e.events.once('shutdown', () => Object.entries(escuchas).forEach(([tipo, fn]) => ev.off(tipo, fn)));
-    e.radio.mostrar(`Layla está en la mesa de mando. Habla con ella pulsando ${TECLAS.radio}.`, { duracion: 4500 });
+    e.radio.mostrar(`Layla está en la mesa de mando. Habla con ella pulsando ${nombreTecla(TECLAS.radio)}.`, { duracion: 4500 });
   }
 
   // Hablo yo (voz a texto): Layla lo recibe escrito y lo oye con voz sintetizada según el género de mi DNI
@@ -93,8 +94,14 @@ export default class Multijugador {
     e.game.voice?.hablar(texto, undefined, 'M');
   }
 
+  // La marca más reciente de un tipo que todavía guía a los soldados (si no, null)
+  ultimaMarca(tipo) {
+    return this.marcas.filter((m) => m.tipo === tipo && m.id > this.ignorarHasta).sort((p, q) => q.id - p.id)[0] ?? null;
+  }
+
   alOrdenDeLayla(m) {
     const e = this.escena;
+    if (m.tipo === 'avanzar' || m.tipo === 'mantener') this.ignorarHasta = this.idMarca; // una orden nueva pasa por encima de las marcas que ya había
     if (m.tipo === 'atacar') {
       const objetivo = e.objetivos.find((o) => o.activo && o.id === m.id);
       if (!objetivo) return;
@@ -126,6 +133,13 @@ export default class Multijugador {
       .setOrigin(0.5)
       .setDepth(5.8);
     this.marcas.push(marca);
+    // Los soldados le hacen caso a las marcas de Layla (ver Aliados): van al objetivo que marcó, se reúnen donde dice "aliados aquí" y evitan el peligro
+    const aviso = {
+      bomba: 'Layla: los soldados van hacia el objetivo marcado.',
+      aliados: 'Layla: los soldados se reúnen en la marca.',
+      peligro: 'Layla: los soldados evitan la zona de peligro.',
+    }[m.tipo];
+    if (aviso) e.radio.mostrar(aviso, { duracion: 2800 });
     ambiente.pulso('#ffd35a', 500, 0);
     playSfx(e, 'sfx_menu_mover', { volume: 0.6 });
   }
